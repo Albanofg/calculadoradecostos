@@ -1,0 +1,27 @@
+# dependencias
+node_modules
+
+# build
+.next
+out
+*.tsbuildinfo
+
+# base de datos local (PGlite). En producción se usa Neon.
+.data
+
+# variables de entorno
+.env
+.env*.local
+
+# logs
+*.log
+npm-debug.log*
+
+# artefactos de trabajo de Impeccable
+.impeccable/review
+.impeccable/questions
+.impeccable/mocks
+
+# sistema operativo
+.DS_Store
+Thumbs.db
