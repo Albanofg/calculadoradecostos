@@ -110,6 +110,10 @@ body {
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* El guard contra scroll horizontal va acá y no en `body`: en `body` puede
+     convertirlo en contenedor de scroll y romper el `position: sticky` de la
+     caja del total. En `html` propaga al viewport sin ese riesgo. */
+  overflow-x: hidden;
 }
 
 body {
@@ -129,7 +133,6 @@ body {
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
 }
 
 ::selection {
@@ -2033,5 +2036,92 @@ a.cambio-nombre:hover {
   .cargando-logo {
     animation: none;
     opacity: 1;
+  }
+}
+
+/* ─── Pantallas bajas ────────────────────────────────────────────────────── */
+
+/**
+ * En una notebook de 720p quedan ~610px útiles después de la barra y el padding,
+ * y la caja del total medía ~646px: el botón de guardar caía fuera y había que
+ * scrollear hasta el fondo de la página para llegar.
+ *
+ * Dos medidas: se compacta la caja, y el pie queda pegado abajo con sticky
+ * dentro del propio scroll de la caja. Así el botón está a la vista aunque la
+ * pantalla sea más baja todavía.
+ */
+@media (min-width: 1024px) {
+  .total-caja {
+    max-height: calc(100dvh - 62px - var(--e5) * 2);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Sticky adentro del contenedor que scrollea: el botón no se va nunca. */
+  .total-pie {
+    position: sticky;
+    bottom: 0;
+    background: var(--bosque-hondo);
+    border-top: 1px solid rgba(251, 249, 243, 0.16);
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 760px) {
+  /* Un 1920x1080 al 150% de escala son 1280x720 px CSS, y con el cromo del
+     navegador el viewport real queda en ~610px de alto. Acá se recupera todo
+     el alto que se pueda: el offset del sticky y el padding de la página. */
+  .total-caja {
+    top: calc(62px + var(--e3));
+    max-height: calc(100dvh - 62px - var(--e3) * 2);
+  }
+
+  .total-seccion {
+    padding: var(--e3) var(--e4);
+  }
+
+  .total-grande {
+    font-size: 29px;
+    margin-top: 3px;
+  }
+
+  .total-renglon {
+    font-size: 13px;
+    padding-block: 1px;
+  }
+
+  .total-renglon--fuerte {
+    font-size: 12px;
+    padding-top: var(--e2);
+    margin-top: var(--e1);
+  }
+
+  .precio-final-abrir {
+    margin-top: var(--e2);
+    min-height: 36px;
+    font-size: 12.5px;
+  }
+
+  .precio-final {
+    margin-top: var(--e3);
+    padding-top: var(--e3);
+  }
+
+  .precio-final .entrada {
+    min-height: 42px;
+    font-size: 17px;
+  }
+
+  /* El título de la página también come alto en una pantalla baja. */
+  .pagina {
+    padding-block-start: var(--e4);
+  }
+
+  .titulo-pagina {
+    font-size: clamp(22px, 3vw, 28px);
+  }
+
+  .bajada {
+    font-size: 14px;
+    margin-bottom: var(--e4);
   }
 }
