@@ -1,6 +1,7 @@
 import 'server-only'
 import { consultar, nuevoId } from './db.ts'
 import type {
+  Foto,
   Ingrediente,
   LineaExtra,
   LineaIngrediente,
@@ -8,6 +9,8 @@ import type {
   Receta,
   Unidad,
 } from './costeo.ts'
+
+type FilaFoto = { id: string; receta_id: string; epigrafe: string }
 
 /** Postgres devuelve numeric como string, en Neon y en PGlite por igual. */
 const n = (v: unknown): number => {
@@ -122,20 +125,27 @@ type FilaReceta = {
   numero: number
   nombre: string
   descripcion: string
+  procedimiento: string | null
   rinde: unknown
   margen: unknown
   fecha: unknown
 }
 
-const aReceta = (f: FilaReceta): Omit<Receta, 'ingredientes' | 'manoDeObra' | 'extras'> => ({
+type CabeceraReceta = Omit<Receta, 'ingredientes' | 'manoDeObra' | 'extras' | 'fotos'>
+
+const aReceta = (f: FilaReceta): CabeceraReceta => ({
   id: f.id,
   numero: Number(f.numero),
   nombre: f.nombre,
   descripcion: f.descripcion,
+  procedimiento: f.procedimiento ?? '',
   rinde: nOrNull(f.rinde),
   margen: n(f.margen),
   fecha: iso(f.fecha) ?? new Date().toISOString(),
 })
+
+const COLUMNAS_RECETA =
+  'id, numero, nombre, descripcion, procedimiento, rinde, margen, fecha'
 
 export const listarRecetas = (): Promise<Receta[]> => cargarRecetas()
 
@@ -144,28 +154,34 @@ export async function obtenerReceta(id: string): Promise<Receta | null> {
   return receta ?? null
 }
 
-async function cargarRecetas(soloId?: string): Promise<Receta[]> {
+/**
+ * `fotos: 'todas'` trae las imágenes enteras; 'portada' sólo la primera de cada
+ * receta, que es lo que necesita la grilla del recetario. Una foto son decenas
+ * de kilobytes, así que traerlas todas para listar sería pesado al pedo.
+ */
+async function cargarRecetas(
+  soloId?: string,
+  fotos: 'todas' | 'portada' | 'ninguna' = 'todas',
+): Promise<Receta[]> {
   const cabeceras = soloId
     ? await consultar<FilaReceta>(
-        `select id, numero, nombre, descripcion, rinde, margen, fecha
-           from recetas where id = $1`,
+        `select ${COLUMNAS_RECETA} from recetas where id = $1`,
         [soloId],
       )
     : await consultar<FilaReceta>(
-        `select id, numero, nombre, descripcion, rinde, margen, fecha
-           from recetas order by numero desc`,
+        `select ${COLUMNAS_RECETA} from recetas order by numero desc`,
       )
   if (cabeceras.length === 0) return []
 
   const ids = cabeceras.map((c) => c.id)
-  const [ings, mano, extras] = await Promise.all([
+  const [ings, mano, extras, imagenes] = await Promise.all([
     consultar<{ id: string; receta_id: string; ingrediente_id: string | null; cantidad: unknown }>(
       `select id, receta_id, ingrediente_id, cantidad from receta_ingredientes
         where receta_id = any($1::text[]) order by orden`,
       [ids],
     ),
-    consultar<{ id: string; receta_id: string; concepto: string; horas: unknown; valor_hora: unknown }>(
-      `select id, receta_id, concepto, horas, valor_hora from receta_mano_obra
+    consultar<{ id: string; receta_id: string; concepto: string; minutos: unknown; valor_hora: unknown }>(
+      `select id, receta_id, concepto, minutos, valor_hora from receta_mano_obra
         where receta_id = any($1::text[]) order by orden`,
       [ids],
     ),
@@ -174,6 +190,23 @@ async function cargarRecetas(soloId?: string): Promise<Receta[]> {
         where receta_id = any($1::text[]) order by orden`,
       [ids],
     ),
+    // Nunca traemos la columna `datos`: pesa decenas de KB por foto y el
+    // cliente la pide por separado a /api/foto/<id>.
+    fotos === 'ninguna'
+      ? Promise.resolve([] as FilaFoto[])
+      : fotos === 'portada'
+        ? consultar<FilaFoto>(
+            `select distinct on (receta_id) id, receta_id, epigrafe
+               from receta_fotos
+              where receta_id = any($1::text[])
+              order by receta_id, orden`,
+            [ids],
+          )
+        : consultar<FilaFoto>(
+            `select id, receta_id, epigrafe from receta_fotos
+              where receta_id = any($1::text[]) order by orden`,
+            [ids],
+          ),
   ])
 
   const por = <T extends { receta_id: string }>(filas: T[]) => {
@@ -188,6 +221,7 @@ async function cargarRecetas(soloId?: string): Promise<Receta[]> {
   const mIngs = por(ings)
   const mMano = por(mano)
   const mExtras = por(extras)
+  const mFotos = por(imagenes)
 
   return cabeceras.map((c) => ({
     ...aReceta(c),
@@ -202,15 +236,20 @@ async function cargarRecetas(soloId?: string): Promise<Receta[]> {
       (f): LineaManoDeObra => ({
         id: f.id,
         concepto: f.concepto,
-        horas: nOrNull(f.horas),
+        minutos: nOrNull(f.minutos),
         valorHora: nOrNull(f.valor_hora),
       }),
     ),
     extras: (mExtras.get(c.id) ?? []).map(
       (f): LineaExtra => ({ id: f.id, concepto: f.concepto, monto: nOrNull(f.monto) }),
     ),
+    fotos: (mFotos.get(c.id) ?? []).map((f): Foto => ({ id: f.id, epigrafe: f.epigrafe })),
   }))
 }
+
+/** Para la grilla del recetario: una sola foto por receta. */
+export const listarRecetario = (): Promise<Receta[]> =>
+  cargarRecetas(undefined, 'portada')
 
 /** Guarda una receta nueva o pisa una existente, siempre por referencia a ingredientes. */
 export async function guardarReceta(receta: Receta): Promise<string> {
@@ -221,10 +260,14 @@ export async function guardarReceta(receta: Receta): Promise<string> {
 
   if (existe) {
     await consultar(
-      `update recetas set nombre = $2, descripcion = $3, rinde = $4, margen = $5, actualizado = now()
+      `update recetas
+          set nombre = $2, descripcion = $3, procedimiento = $4,
+              rinde = $5, margen = $6, actualizado = now()
         where id = $1`,
-      [id, receta.nombre.trim(), receta.descripcion, receta.rinde, receta.margen],
+      [id, receta.nombre.trim(), receta.descripcion, receta.procedimiento, receta.rinde, receta.margen],
     )
+    // Las fotos no se tocan acá: se agregan y borran por su cuenta, para no
+    // mandar de nuevo cada imagen en cada guardado.
     await Promise.all([
       consultar(`delete from receta_ingredientes where receta_id = $1`, [id]),
       consultar(`delete from receta_mano_obra where receta_id = $1`, [id]),
@@ -232,8 +275,9 @@ export async function guardarReceta(receta: Receta): Promise<string> {
     ])
   } else {
     await consultar(
-      `insert into recetas (id, nombre, descripcion, rinde, margen) values ($1, $2, $3, $4, $5)`,
-      [id, receta.nombre.trim(), receta.descripcion, receta.rinde, receta.margen],
+      `insert into recetas (id, nombre, descripcion, procedimiento, rinde, margen)
+       values ($1, $2, $3, $4, $5, $6)`,
+      [id, receta.nombre.trim(), receta.descripcion, receta.procedimiento, receta.rinde, receta.margen],
     )
   }
 
@@ -242,8 +286,8 @@ export async function guardarReceta(receta: Receta): Promise<string> {
     .map((l, i) => [nuevoId(), id, l.ingredienteId, l.cantidad, i])
 
   const mano = receta.manoDeObra
-    .filter((l) => l.concepto.trim() || l.horas !== null || l.valorHora !== null)
-    .map((l, i) => [nuevoId(), id, l.concepto, l.horas, l.valorHora, i])
+    .filter((l) => l.concepto.trim() || l.minutos !== null || l.valorHora !== null)
+    .map((l, i) => [nuevoId(), id, l.concepto, l.minutos, l.valorHora, i])
 
   const extras = receta.extras
     .filter((l) => l.concepto.trim() || l.monto !== null)
@@ -251,7 +295,7 @@ export async function guardarReceta(receta: Receta): Promise<string> {
 
   await Promise.all([
     insertarFilas('receta_ingredientes', ['id', 'receta_id', 'ingrediente_id', 'cantidad', 'orden'], ingredientes),
-    insertarFilas('receta_mano_obra', ['id', 'receta_id', 'concepto', 'horas', 'valor_hora', 'orden'], mano),
+    insertarFilas('receta_mano_obra', ['id', 'receta_id', 'concepto', 'minutos', 'valor_hora', 'orden'], mano),
     insertarFilas('receta_extras', ['id', 'receta_id', 'concepto', 'monto', 'orden'], extras),
   ])
 
@@ -286,6 +330,41 @@ async function insertarFilas(
 
 export async function borrarReceta(id: string): Promise<void> {
   await consultar(`delete from recetas where id = $1`, [id])
+}
+
+// ─── Fotos ───────────────────────────────────────────────────────────────────
+
+export async function agregarFoto(
+  recetaId: string,
+  datos: string,
+  epigrafe = '',
+): Promise<Foto | null> {
+  const existe = await consultar<{ id: string }>(`select id from recetas where id = $1`, [recetaId])
+  if (existe.length === 0) return null
+
+  const siguiente = await consultar<{ proximo: number }>(
+    `select coalesce(max(orden) + 1, 0)::int as proximo from receta_fotos where receta_id = $1`,
+    [recetaId],
+  )
+  const id = nuevoId()
+  await consultar(
+    `insert into receta_fotos (id, receta_id, datos, epigrafe, orden) values ($1, $2, $3, $4, $5)`,
+    [id, recetaId, datos, epigrafe, Number(siguiente[0]?.proximo ?? 0)],
+  )
+  return { id, epigrafe }
+}
+
+export async function borrarFoto(id: string): Promise<void> {
+  await consultar(`delete from receta_fotos where id = $1`, [id])
+}
+
+/** La imagen en sí. La pide /api/foto/<id>, no las páginas. */
+export async function obtenerFotoDatos(id: string): Promise<string | null> {
+  const filas = await consultar<{ datos: string }>(
+    `select datos from receta_fotos where id = $1`,
+    [id],
+  )
+  return filas[0]?.datos ?? null
 }
 
 export async function duplicarReceta(id: string): Promise<string | null> {

@@ -93,8 +93,9 @@ export function Catalogo({
         </button>
       )}
 
-      <div className="linea-fila" style={{ flexWrap: 'wrap', gap: 'var(--esp-3)' }}>
-        <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+      <div className="herramientas">
+        <div className="buscador">
+          <Icono nombre="buscar" tam={18} />
           <label className="solo-lectores" htmlFor="buscar">
             Buscar ingrediente
           </label>
@@ -109,14 +110,9 @@ export function Catalogo({
         </div>
         <button
           type="button"
-          className="boton boton--fantasma"
+          className={`boton${soloSinPrecio ? ' boton--activo' : ''}`}
           onClick={() => setSoloSinPrecio((v) => !v)}
           aria-pressed={soloSinPrecio}
-          style={
-            soloSinPrecio
-              ? { background: 'var(--grafito)', color: 'var(--tinta-sobre-esmalte)', borderColor: 'var(--rim)' }
-              : undefined
-          }
         >
           Sólo los que faltan ({sinPrecio})
         </button>
@@ -141,13 +137,13 @@ export function Catalogo({
       ) : (
         porCategoria.map(([categoria, items]) => (
           <section key={categoria} className="pila">
-            <h2 className="rotulo" style={{ color: 'var(--tinta-suave)' }}>
+            <h2 className="rotulo-categoria">
               {categoria} · {items.length}
             </h2>
             <div className="grilla-catalogo">
               {items.map((i) =>
                 editando === i.id ? (
-                  <div key={i.id} className="ficha" style={{ gridColumn: '1 / -1' }}>
+                  <div key={i.id} className="ficha ficha--ancha">
                     <FormularioIngrediente
                       categorias={categorias}
                       ingrediente={i}
@@ -215,7 +211,7 @@ function FichaIngrediente({
       </div>
 
       <div className="linea-fila">
-        <div className="con-sufijo" style={{ flex: '1 1 auto', minWidth: 0 }}>
+        <div className="con-sufijo con-sufijo--crece">
           <label className="solo-lectores" htmlFor={`precio-${ingrediente.id}`}>
             Precio {ETIQUETA_UNIDAD[ingrediente.unidad]} de {ingrediente.nombre}
           </label>
@@ -303,8 +299,8 @@ function FormularioIngrediente({
         />
       </div>
 
-      <div className="linea-fila" style={{ flexWrap: 'wrap', gap: 'var(--esp-3)' }}>
-        <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+      <div className="grupo-campos">
+        <div className="grupo-campo">
           <label className="etiqueta" htmlFor={`f-unidad-${ingrediente?.id ?? 'nuevo'}`}>
             Lo comprás por
           </label>
@@ -322,7 +318,7 @@ function FormularioIngrediente({
           </select>
         </div>
 
-        <div style={{ flex: '1 1 150px', minWidth: 0 }}>
+        <div className="grupo-campo">
           <label className="etiqueta" htmlFor={`f-precio-${ingrediente?.id ?? 'nuevo'}`}>
             Precio
           </label>
@@ -336,7 +332,7 @@ function FormularioIngrediente({
           />
         </div>
 
-        <div style={{ flex: '1 1 170px', minWidth: 0 }}>
+        <div className="grupo-campo">
           <label className="etiqueta" htmlFor={`f-cat-${ingrediente?.id ?? 'nuevo'}`}>
             Categoría
           </label>
@@ -374,8 +370,7 @@ function FormularioIngrediente({
           <button
             type="submit"
             formAction={accionBorrarIngrediente}
-            className="boton boton--fantasma boton--peligro"
-            style={{ marginLeft: 'auto' }}
+            className="boton boton--fantasma boton--peligro empuja"
           >
             <Icono nombre="basura" tam={16} />
             Borrar

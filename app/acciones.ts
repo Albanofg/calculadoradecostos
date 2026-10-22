@@ -7,6 +7,8 @@ import { UNIDADES } from '@/lib/costeo.ts'
 import {
   actualizarIngrediente,
   actualizarPrecio,
+  agregarFoto,
+  borrarFoto,
   borrarIngrediente,
   borrarReceta,
   crearIngrediente,
@@ -88,7 +90,7 @@ export async function accionEditarIngrediente(
   }
   revalidatePath('/ingredientes')
   revalidatePath('/')
-  revalidatePath('/recetas')
+  revalidatePath('/presupuesto')
   return { ok: true }
 }
 
@@ -100,7 +102,7 @@ export async function accionActualizarPrecio(id: string, precio: number): Promis
   await actualizarPrecio(id, precio)
   revalidatePath('/ingredientes')
   revalidatePath('/')
-  revalidatePath('/recetas')
+  revalidatePath('/presupuesto')
   return { ok: true }
 }
 
@@ -109,14 +111,14 @@ export async function accionBorrarIngrediente(datos: FormData): Promise<void> {
   if (id) await borrarIngrediente(id)
   revalidatePath('/ingredientes')
   revalidatePath('/')
-  revalidatePath('/recetas')
+  revalidatePath('/presupuesto')
 }
 
 // ─── Recetas ─────────────────────────────────────────────────────────────────
 
 export async function accionGuardarReceta(receta: Receta): Promise<{ id: string }> {
   const id = await guardarReceta(receta)
-  revalidatePath('/recetas')
+  revalidatePath('/presupuesto')
   revalidatePath('/')
   return { id }
 }
@@ -124,13 +126,52 @@ export async function accionGuardarReceta(receta: Receta): Promise<{ id: string 
 export async function accionBorrarReceta(datos: FormData): Promise<void> {
   const id = texto(datos.get('id'))
   if (id) await borrarReceta(id)
-  revalidatePath('/recetas')
+  revalidatePath('/')
+  revalidatePath('/presupuesto')
+}
+
+// ─── Fotos ───────────────────────────────────────────────────────────────────
+
+/** Tope de seguridad: las imágenes ya vienen achicadas desde el navegador. */
+const MAX_FOTO = 900_000
+
+export async function accionAgregarFoto(
+  recetaId: string,
+  datos: string,
+  epigrafe = '',
+): Promise<{ ok: true; foto: { id: string; epigrafe: string } } | { ok: false; error: string }> {
+  if (!recetaId) {
+    return { ok: false, error: 'Guardá la receta antes de agregarle fotos.' }
+  }
+  if (!datos.startsWith('data:image/')) {
+    return { ok: false, error: 'Ese archivo no es una imagen.' }
+  }
+  if (datos.length > MAX_FOTO) {
+    return { ok: false, error: 'La foto quedó muy pesada. Probá con otra.' }
+  }
+
+  const foto = await agregarFoto(recetaId, datos, epigrafe)
+  if (!foto) return { ok: false, error: 'No encontramos esa receta.' }
+
+  revalidatePath('/')
+  revalidatePath('/presupuesto')
+  revalidatePath(`/receta/${recetaId}`)
+  return { ok: true, foto }
+}
+
+export async function accionBorrarFoto(id: string, recetaId: string): Promise<void> {
+  if (!id) return
+  await borrarFoto(id)
+  revalidatePath('/')
+  revalidatePath('/presupuesto')
+  revalidatePath(`/receta/${recetaId}`)
 }
 
 export async function accionDuplicarReceta(datos: FormData): Promise<void> {
   const id = texto(datos.get('id'))
   if (!id) return
   const nuevo = await duplicarReceta(id)
-  revalidatePath('/recetas')
+  revalidatePath('/')
+  revalidatePath('/presupuesto')
   if (nuevo) redirect(`/receta/${nuevo}`)
 }

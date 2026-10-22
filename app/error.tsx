@@ -27,9 +27,7 @@ export default function Error({
               : 'No pudimos cargar esta pantalla. Tus datos están guardados; esto es un problema de la app, no de lo que cargaste.'}
           </p>
           {!faltaBase && error.digest ? (
-            <p className="rotulo" style={{ color: 'var(--tinta-suave)' }}>
-              Código {error.digest}
-            </p>
+            <p className="nota">Código {error.digest}</p>
           ) : null}
           <button type="button" className="boton boton--principal" onClick={reset}>
             Reintentar

@@ -19,6 +19,13 @@ export type Nombre =
   | 'escalar'
   | 'lapiz'
   | 'listo'
+  | 'descargar'
+  | 'camara'
+  | 'buscar'
+  | 'orden'
+  | 'libro'
+  | 'cruz'
+  | 'volver'
 
 /** Un solo sistema de trazo: 1.75px, puntas rectas, sin relleno. */
 const TRAZOS: Record<Nombre, React.ReactNode> = {
@@ -81,6 +88,28 @@ const TRAZOS: Record<Nombre, React.ReactNode> = {
     </>
   ),
   listo: <path d="M4 12l6 6L20 6" />,
+  descargar: <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3h16v-3" />,
+  camara: (
+    <>
+      <path d="M3 8h4l2-3h6l2 3h4v12H3z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </>
+  ),
+  buscar: (
+    <>
+      <circle cx="11" cy="11" r="6" />
+      <path d="M15.5 15.5L20 20" />
+    </>
+  ),
+  orden: <path d="M4 7h16M6 12h12M9 17h6" />,
+  libro: (
+    <>
+      <path d="M4 4h7a2 2 0 012 2v14a2 2 0 00-2-2H4z" />
+      <path d="M20 4h-7a2 2 0 00-2 2v14a2 2 0 012-2h7z" />
+    </>
+  ),
+  cruz: <path d="M6 6l12 12M18 6L6 18" />,
+  volver: <path d="M19 12H5m0 0l6-6m-6 6l6 6" />,
 }
 
 export function Icono({ nombre, tam = 20, className }: Props) {

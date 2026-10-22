@@ -43,8 +43,9 @@ This is the product. A recipe history that froze its costs at save time would be
 - **Language and locale — confirmed.** Spanish, Argentine, `vos` register throughout her workbook ("Mantené actualizada esta lista", "Completá los datos", "Ingresá las horas"). Currency is Argentine pesos, formatted `$ #,##0.00` in her summary cells and `$ #,##0` in price-reference cells.
 - **Devices — confirmed.** Phone and laptop. The user named phones, tablets, 720p and 1080p as required targets.
 - **Physical scene — confirmed by inference from the artifact.** A home kitchen and a kitchen table. Phone use happens with hands that have been in butter and flour; laptop use happens when quoting a client. Both are indoor, daytime-to-evening, well-lit domestic settings.
+- **Tiempo en minutos, tarifa por hora — decidido con el usuario (2026-10-22).** La planilla pedía `HORAS`, pero decorar una torta lleva veinte minutos y nadie piensa eso como "0,33 horas". El campo pasó a minutos y la tarifa quedó por hora, que sí es como se piensa una tarifa. Se guarda en minutos y no en horas fraccionarias porque con `numeric(10,2)` 40 minutos serían `0.67` horas y al reconvertir darían 40,2.
 - **Her working units — confirmed.** Ingredients are *stocked* and *priced* per KG, LITRO or UNIDAD, but *used* in grams, millilitres or whole units. Her cost formula encodes exactly this: `precio × cantidad / 1000` for KG/LITRO, `precio × cantidad` for UNIDAD. She enters `500` meaning 500 g of flour priced at `$40/KG`.
-- **Her vocabulary — confirmed, must be preserved verbatim.** `INGREDIENTES`, `CANTIDAD`, `PRECIO REF.`, `COSTO`, `MANO DE OBRA`, `HORAS`, `$ x HORA`, `PACKAGING Y GASTOS EXTRAS`, `MONTO`, `COSTO TOTAL DE PRODUCCIÓN`, `Costo por porción / unidad`, `% Margen de ganancia deseado`, `Ganancia en $`, `PRECIO DE VENTA SUGERIDO`, `Cantidad que rinde (porciones / unidades)`.
+- **Her vocabulary — confirmed, must be preserved verbatim.** `INGREDIENTES`, `CANTIDAD`, `PRECIO REF.`, `COSTO`, `MANO DE OBRA`, `$ x HORA`, `PACKAGING Y GASTOS EXTRAS`, `MONTO`, `COSTO TOTAL DE PRODUCCIÓN`, `Costo por porción / unidad`, `% Margen de ganancia deseado`, `Ganancia en $`, `PRECIO DE VENTA SUGERIDO`, `Cantidad que rinde (porciones / unidades)`.
 - **Her categories — confirmed, as entered (casing is inconsistent in the source and will be normalized).** Básicos, Lácteos, Especiales, Esencias, Rellenos, Frutas, Decoración, Galletas, Chocolate.
 - **Capacity the template allots — confirmed.** 29 ingredient rows, 5 labor rows and 8 expense rows per recipe, all fixed. The template's own sample recipes run 2 to 12 ingredient lines, 0 to 1 labor lines and 1 to 3 expense lines. The app must impose no ceiling at all, and must not design for 29 rows as the common case: rows are added on demand, and the common recipe is under a dozen lines.
 
@@ -56,7 +57,7 @@ This is the product. A recipe history that froze its costs at save time would be
 |---|---|---|
 | Ingredient line cost | `precio × cantidad / 1000` when unit is KG/LITRO/GR/ML; `precio × cantidad` when UNIDAD | `F13` |
 | Ingredient subtotal | sum of line costs | `F42` |
-| Labor line cost | `horas × $porHora` | `F46` |
+| Labor line cost | `minutos / 60 × $porHora` | `F46` (la planilla usaba `horas × $porHora`) |
 | Labor subtotal | sum of line costs | `F51` |
 | Extras subtotal | sum of `monto` | `F63` |
 | **Costo total de producción** | `ingredientes + manoDeObra + extras` | `F69` |

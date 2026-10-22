@@ -1,6 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { costear, costoDeLinea, escalar, type Ingrediente, type Receta } from './costeo.ts'
+import {
+  costear,
+  costoDeLinea,
+  costoDeTiempo,
+  escalar,
+  type Ingrediente,
+  type Receta,
+} from './costeo.ts'
 
 const ing = (over: Partial<Ingrediente> = {}): Ingrediente => ({
   id: 'i1',
@@ -19,12 +26,14 @@ const receta = (over: Partial<Receta> = {}): Receta => ({
   numero: 1,
   nombre: 'Prueba',
   descripcion: '',
+  procedimiento: '',
   rinde: null,
   margen: 0,
   fecha: '2026-10-21',
   ingredientes: [],
   manoDeObra: [],
   extras: [],
+  fotos: [],
   ...over,
 })
 
@@ -68,7 +77,7 @@ test('el total replica la planilla: ingredientes + mano de obra + extras', () =>
   const c = costear(
     receta({
       ingredientes: [{ id: 'l1', ingredienteId: 'i1', cantidad: 500 }],
-      manoDeObra: [{ id: 'm1', concepto: 'Elaboración', horas: 2, valorHora: 5000 }],
+      manoDeObra: [{ id: 'm1', concepto: 'Elaboración', minutos: 120, valorHora: 5000 }],
       extras: [{ id: 'e1', concepto: 'Caja', monto: 1200 }],
     }),
     catalogo,
@@ -77,6 +86,19 @@ test('el total replica la planilla: ingredientes + mano de obra + extras', () =>
   assert.equal(c.manoDeObra, 10000)
   assert.equal(c.extras, 1200)
   assert.equal(c.total, 11220)
+})
+
+test('la mano de obra se cobra por minuto con tarifa por hora: 90 min a $4000/h = $6000', () => {
+  assert.equal(costoDeTiempo(90, 4000), 6000)
+})
+
+test('20 minutos a $4000/h son $1333,33 y no se redondean a una hora', () => {
+  assert.ok(Math.abs(costoDeTiempo(20, 4000) - 4000 / 3) < 1e-9)
+})
+
+test('sin minutos o sin tarifa, la mano de obra no suma', () => {
+  assert.equal(costoDeTiempo(null, 4000), 0)
+  assert.equal(costoDeTiempo(90, null), 0)
 })
 
 test('el margen es markup sobre el costo, como en la planilla (F73 = F69 + F69*D71)', () => {
@@ -144,19 +166,19 @@ test('el costeo avisa qué ingredientes entran sin precio', () => {
   assert.equal(c.incierto, true)
 })
 
-test('escalar multiplica cantidades e horas, pero no los extras', () => {
+test('escalar multiplica cantidades y minutos, pero no los extras', () => {
   const r = escalar(
     receta({
       rinde: 10,
       ingredientes: [{ id: 'l1', ingredienteId: 'i1', cantidad: 500 }],
-      manoDeObra: [{ id: 'm1', concepto: 'x', horas: 2, valorHora: 5000 }],
+      manoDeObra: [{ id: 'm1', concepto: 'x', minutos: 120, valorHora: 5000 }],
       extras: [{ id: 'e1', concepto: 'Caja', monto: 1200 }],
     }),
     20,
   )
   assert.equal(r.rinde, 20)
   assert.equal(r.ingredientes[0].cantidad, 1000)
-  assert.equal(r.manoDeObra[0].horas, 4)
+  assert.equal(r.manoDeObra[0].minutos, 240)
   assert.equal(r.extras[0].monto, 1200)
 })
 

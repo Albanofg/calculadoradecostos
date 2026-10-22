@@ -12,7 +12,7 @@ export default function NoEncontrado() {
             Puede que la hayas borrado, o que el link esté viejo. Mirá el historial para
             encontrarla.
           </p>
-          <Link href="/recetas" className="boton boton--principal">
+          <Link href="/" className="boton boton--principal">
             Ver mis recetas
           </Link>
         </div>

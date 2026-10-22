@@ -1,6 +1,8 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Calculadora } from '@/components/Calculadora.tsx'
 import { FaltaBase } from '@/components/FaltaBase.tsx'
+import { Icono } from '@/components/Icono.tsx'
 import { faltaConfiguracion } from '@/lib/db.ts'
 import { listarIngredientes, obtenerReceta } from '@/lib/datos.ts'
 import { fecha } from '@/lib/format.ts'
@@ -19,6 +21,10 @@ export default async function PaginaReceta({
 
   return (
     <main className="pagina">
+      <Link href="/" className="volver">
+        <Icono nombre="volver" tam={16} className="icono-vuelve" />
+        Recetario
+      </Link>
       <h1 className="titulo-pagina display">{receta.nombre}</h1>
       <p className="bajada">
         Receta N° {receta.numero} · guardada el {fecha(receta.fecha)}. Los costos se recalculan

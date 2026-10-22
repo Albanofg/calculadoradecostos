@@ -1,5 +1,5 @@
 import 'server-only'
-import { SENTENCIAS } from './esquema.ts'
+import { ULTIMA_VERSION, VERSIONES } from './esquema.ts'
 
 /**
  * Un solo dialecto SQL para los dos lados.
@@ -48,26 +48,51 @@ async function crearPglite(): Promise<Consultar> {
 }
 
 /**
- * Aplicar el esquema cuesta una ida y vuelta por sentencia, y sobre Neon por
- * HTTP eso son ~10 viajes en cada arranque en frío. Si las tablas ya están,
- * una sola consulta alcanza para saberlo.
+ * Aplica sólo las versiones que falten.
+ *
+ * Sobre Neon por HTTP cada sentencia es una ida y vuelta, así que en el caso
+ * normal (base al día) esto cuesta una sola consulta: leer la versión.
  */
 async function migrar(consultar: Consultar) {
-  const yaEsta = await consultar<{ existe: boolean }>(
-    `select to_regclass('public.ajustes') is not null as existe`,
-  )
-  if (yaEsta[0]?.existe) return
+  const actual = await versionActual(consultar)
+  if (actual >= ULTIMA_VERSION) return
 
-  for (const sentencia of SENTENCIAS) {
-    try {
-      await consultar(sentencia)
-    } catch (error) {
-      // Dos arranques en frío a la vez pueden chocar creando la misma tabla.
-      // Si el objeto ya existe, el que perdió la carrera igual está bien.
-      const mensaje = error instanceof Error ? error.message : String(error)
-      if (!/already exists|duplicate key|ya existe/i.test(mensaje)) throw error
+  for (const { version, sentencias } of VERSIONES) {
+    if (version <= actual) continue
+    for (const sentencia of sentencias) {
+      try {
+        await consultar(sentencia)
+      } catch (error) {
+        // Dos arranques en frío a la vez pueden chocar creando la misma tabla.
+        // Si el objeto ya existe, el que perdió la carrera igual está bien.
+        const mensaje = error instanceof Error ? error.message : String(error)
+        if (!/already exists|duplicate key|ya existe/i.test(mensaje)) throw error
+      }
     }
   }
+
+  await consultar(
+    `insert into ajustes (clave, valor) values ('esquema_version', $1)
+     on conflict (clave) do update set valor = excluded.valor`,
+    [String(ULTIMA_VERSION)],
+  )
+}
+
+/**
+ * 0 = base vacía. Una base que ya existía antes de que esto estuviera
+ * versionado no tiene la marca, pero sí la tabla `ajustes`: ésa es la 1.
+ */
+async function versionActual(consultar: Consultar): Promise<number> {
+  const hayAjustes = await consultar<{ existe: boolean }>(
+    `select to_regclass('public.ajustes') is not null as existe`,
+  )
+  if (!hayAjustes[0]?.existe) return 0
+
+  const marca = await consultar<{ valor: string }>(
+    `select valor from ajustes where clave = 'esquema_version'`,
+  )
+  const guardada = Number(marca[0]?.valor)
+  return Number.isFinite(guardada) && guardada > 0 ? guardada : 1
 }
 
 function arrancar() {
@@ -86,23 +111,46 @@ function arrancar() {
     if (globalThis.__calcDb?.listo === abriendo) globalThis.__calcDb = undefined
   })
 
+  // Una sola migración de rescate por proceso, para que N pedidos fallando a la
+  // vez no disparen N migraciones en paralelo.
+  let rescate: Promise<void> | null = null
+
   globalThis.__calcDb = {
     consultar: async (texto, parametros) => {
       await abriendo
-      return consultarReal!(texto, parametros)
+      try {
+        return await consultarReal!(texto, parametros)
+      } catch (error) {
+        if (!faltaAlgoDelEsquema(error)) throw error
+        // El código quedó adelante del esquema: migramos y reintentamos una vez.
+        // Pasa cuando se recarga el código sin reiniciar el proceso, y antes
+        // dejaba la app rota hasta un reinicio a mano.
+        rescate ??= migrar(consultarReal!).finally(() => {
+          rescate = null
+        })
+        await rescate
+        return await consultarReal!(texto, parametros)
+      }
     },
     listo: abriendo,
   }
   return globalThis.__calcDb
 }
 
+/**
+ * Postgres avisa con códigos propios cuando falta una tabla (42P01) o una
+ * columna (42703). Cualquier otro error no se reintenta: un dato inválido o una
+ * violación de unicidad no se arreglan migrando.
+ */
+function faltaAlgoDelEsquema(error: unknown): boolean {
+  const codigo = (error as { code?: unknown })?.code
+  if (codigo === '42703' || codigo === '42P01') return true
+  const mensaje = error instanceof Error ? error.message : String(error)
+  return /does not exist|no existe/i.test(mensaje) && /column|relation|columna|relación/i.test(mensaje)
+}
+
 export const consultar: Consultar = (texto, parametros) =>
   arrancar().consultar(texto, parametros)
-
-export const baseLista = () => arrancar().listo
-
-/** Dónde están guardados los datos, para poder decírselo a quien configura el deploy. */
-export const dondeGuarda = (): 'postgres' | 'local' => (urlPostgres() ? 'postgres' : 'local')
 
 /**
  * En producción sin DATABASE_URL no hay dónde guardar: el disco de la función

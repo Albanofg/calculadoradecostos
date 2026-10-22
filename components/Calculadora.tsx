@@ -5,17 +5,29 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   costear,
+  costoDeTiempo,
   escalar,
   UNIDAD_DE_USO,
+  type Foto,
   type Ingrediente,
   type Receta,
 } from '@/lib/costeo.ts'
 import { plata, porcentaje } from '@/lib/format.ts'
 import { accionGuardarReceta } from '@/app/acciones.ts'
+import { Fotos } from './Fotos.tsx'
+import { CifraAnimada } from './CifraAnimada.tsx'
 import { Icono } from './Icono.tsx'
-import { Presupuesto } from './Presupuesto.tsx'
+import { useSalida } from './useSalida.ts'
 
 const id = () => Math.random().toString(36).slice(2, 11)
+
+/**
+ * Aceptar una función además de un objeto importa para los borrados: la baja
+ * de una fila se aplica con un retraso de 220ms (para que se anime la salida),
+ * y dos clicks seguidos calculados sobre el estado viejo resucitarían la
+ * primera fila. Con el updater siempre se parte del estado real.
+ */
+type Cambiar = (parcial: Partial<Receta> | ((r: Receta) => Partial<Receta>)) => void
 
 /** Acepta "1.250,5" y "1250.5" por igual: ella escribe como escribe. */
 function aNumero(v: string): number | null {
@@ -45,8 +57,8 @@ export function Calculadora({
   const porId = useMemo(() => new Map(catalogo.map((i) => [i.id, i])), [catalogo])
   const costeo = useMemo(() => costear(receta, porId), [receta, porId])
 
-  const cambiar = (parcial: Partial<Receta>) => {
-    setReceta((r) => ({ ...r, ...parcial }))
+  const cambiar: Cambiar = (parcial) => {
+    setReceta((r) => ({ ...r, ...(typeof parcial === 'function' ? parcial(r) : parcial) }))
     setGuardado(false)
   }
 
@@ -79,6 +91,14 @@ export function Calculadora({
         <CampoExtras receta={receta} cambiar={cambiar} subtotal={costeo.extras} />
 
         <CampoMargen receta={receta} cambiar={cambiar} costeo={costeo} />
+
+        <CampoProcedimiento receta={receta} cambiar={cambiar} />
+
+        <Fotos
+          recetaId={receta.id}
+          fotos={receta.fotos}
+          onCambio={(fotos: Foto[]) => setReceta((r) => ({ ...r, fotos }))}
+        />
       </div>
 
       <aside className="columna">
@@ -90,15 +110,20 @@ export function Calculadora({
           guardando={guardando}
           guardado={guardado}
         />
-        <Presupuesto receta={receta} costeo={costeo} catalogo={porId} />
       </aside>
 
       <div className="riel">
+        {/* El número grande es el precio de venta: es el que decide si cobra
+            bien. El costo va chico al lado, porque igual lo quiere ver. */}
         <div className="riel-cifras">
           <div className="riel-rotulo">
-            {costeo.incierto ? 'Costo total (incompleto)' : 'Costo total'}
+            Precio de venta
+            {costeo.incierto ? ' · incompleto' : null}
           </div>
-          <div className="riel-total cifra">{plata(costeo.total)}</div>
+          <CifraAnimada className="riel-total" valor={costeo.precioVenta} formato={plata} />
+          <div className="riel-secundario">
+            Costo <CifraAnimada valor={costeo.total} formato={plata} />
+          </div>
         </div>
         <button
           type="button"
@@ -106,7 +131,11 @@ export function Calculadora({
           onClick={guardar}
           disabled={!puedeGuardar}
         >
-          <Icono nombre={guardado ? 'listo' : 'guardar'} tam={18} />
+          <Icono
+            nombre={guardado ? 'listo' : 'guardar'}
+            tam={18}
+            className={guardado ? 'icono-dibuja' : undefined}
+          />
           {guardado ? 'Guardada' : 'Guardar'}
         </button>
       </div>
@@ -122,7 +151,7 @@ function DatosDeLaReceta({
   costeo,
 }: {
   receta: Receta
-  cambiar: (p: Partial<Receta>) => void
+  cambiar: Cambiar
   costeo: ReturnType<typeof costear>
 }) {
   const [rindeDestino, setRindeDestino] = useState('')
@@ -188,18 +217,17 @@ function DatosDeLaReceta({
         </div>
 
         {receta.rinde && receta.rinde > 0 ? (
-          <div className="linea-fila" style={{ flexWrap: 'wrap' }}>
-            <label className="etiqueta" htmlFor="escalar-a" style={{ marginBottom: 0 }}>
+          <div className="linea-fila linea-fila--envuelve">
+            <label className="etiqueta etiqueta--en-linea" htmlFor="escalar-a">
               Escalar a
             </label>
             <input
               id="escalar-a"
-              className="entrada entrada--numero"
+              className="entrada entrada--numero entrada--angosta"
               inputMode="decimal"
               value={rindeDestino}
               onChange={(e) => setRindeDestino(e.target.value)}
               placeholder={String(receta.rinde * 2)}
-              style={{ maxWidth: 110 }}
             />
             <button
               type="button"
@@ -214,7 +242,7 @@ function DatosDeLaReceta({
         ) : null}
 
         {costeo.costoPorPorcion !== null ? (
-          <p className="bajada" style={{ margin: 0, fontSize: 14 }}>
+          <p className="nota">
             Cada porción te cuesta{' '}
             <strong className="cifra">{plata(costeo.costoPorPorcion)}</strong>.
           </p>
@@ -233,7 +261,7 @@ function CampoIngredientes({
   costeo,
 }: {
   receta: Receta
-  cambiar: (p: Partial<Receta>) => void
+  cambiar: Cambiar
   catalogo: Ingrediente[]
   costeo: ReturnType<typeof costear>
 }) {
@@ -252,8 +280,9 @@ function CampoIngredientes({
       ),
     })
 
-  const quitar = (lineaId: string) =>
-    cambiar({ ingredientes: receta.ingredientes.filter((l) => l.id !== lineaId) })
+  const quitarYa = (lineaId: string) =>
+    cambiar((r) => ({ ingredientes: r.ingredientes.filter((l) => l.id !== lineaId) }))
+  const { pedirSalida: quitar, clase: claseSalida } = useSalida(quitarYa)
 
   const porCategoria = useMemo(() => {
     const m = new Map<string, Ingrediente[]>()
@@ -269,7 +298,7 @@ function CampoIngredientes({
     <section className="campo campo--ingredientes">
       <div className="campo-cabeza">
         <h2>Ingredientes</h2>
-        <span className="campo-subtotal cifra">{plata(costeo.ingredientes)}</span>
+        <CifraAnimada className="campo-subtotal" valor={costeo.ingredientes} formato={plata} />
       </div>
       <div className="campo-cuerpo">
         {catalogo.length === 0 ? (
@@ -289,7 +318,9 @@ function CampoIngredientes({
           return (
             <div
               key={linea.id}
-              className={`linea linea--ingrediente${incierto && linea.cantidad ? ' linea--incierta' : ''}`}
+              className={`linea linea--ingrediente${
+                incierto && linea.cantidad ? ' linea--incierta' : ''
+              }${claseSalida(linea.id)}`}
             >
               <div>
                 <label className="solo-lectores" htmlFor={`ing-${linea.id}`}>
@@ -381,14 +412,20 @@ function CampoManoDeObra({
   subtotal,
 }: {
   receta: Receta
-  cambiar: (p: Partial<Receta>) => void
+  cambiar: Cambiar
   subtotal: number
 }) {
   const agregar = () =>
     cambiar({
       manoDeObra: [
         ...receta.manoDeObra,
-        { id: id(), concepto: '', horas: null, valorHora: receta.manoDeObra.at(-1)?.valorHora ?? null },
+        {
+          id: id(),
+          concepto: '',
+          minutos: null,
+          // La tarifa se arrastra de la línea anterior: casi siempre es la misma.
+          valorHora: receta.manoDeObra.at(-1)?.valorHora ?? null,
+        },
       ],
     })
 
@@ -397,24 +434,25 @@ function CampoManoDeObra({
       manoDeObra: receta.manoDeObra.map((l) => (l.id === lineaId ? { ...l, ...parcial } : l)),
     })
 
-  const quitar = (lineaId: string) =>
-    cambiar({ manoDeObra: receta.manoDeObra.filter((l) => l.id !== lineaId) })
+  const quitarYa = (lineaId: string) =>
+    cambiar((r) => ({ manoDeObra: r.manoDeObra.filter((l) => l.id !== lineaId) }))
+  const { pedirSalida: quitar, clase: claseSalida } = useSalida(quitarYa)
 
   return (
     <section className="campo campo--mano">
       <div className="campo-cabeza">
         <h2>Mano de obra</h2>
-        <span className="campo-subtotal cifra">{plata(subtotal)}</span>
+        <CifraAnimada className="campo-subtotal" valor={subtotal} formato={plata} />
       </div>
       <div className="campo-cuerpo">
         {receta.manoDeObra.length === 0 ? (
-          <p className="bajada" style={{ margin: 0, fontSize: 14 }}>
+          <p className="nota">
             Tu tiempo también es un costo. Si no lo querés contar, dejalo vacío.
           </p>
         ) : null}
 
         {receta.manoDeObra.map((l) => (
-          <div key={l.id} className="linea linea--mano">
+          <div key={l.id} className={`linea linea--mano${claseSalida(l.id)}`}>
             <div>
               <label className="solo-lectores" htmlFor={`mo-c-${l.id}`}>
                 Concepto
@@ -429,18 +467,18 @@ function CampoManoDeObra({
               />
             </div>
             <div className="con-sufijo">
-              <label className="solo-lectores" htmlFor={`mo-h-${l.id}`}>
-                Horas
+              <label className="solo-lectores" htmlFor={`mo-m-${l.id}`}>
+                Minutos
               </label>
               <input
-                id={`mo-h-${l.id}`}
+                id={`mo-m-${l.id}`}
                 className="entrada entrada--numero"
-                inputMode="decimal"
-                value={texto(l.horas)}
-                onChange={(e) => editar(l.id, { horas: aNumero(e.target.value) })}
+                inputMode="numeric"
+                value={texto(l.minutos)}
+                onChange={(e) => editar(l.id, { minutos: aNumero(e.target.value) })}
                 placeholder="0"
               />
-              <span className="sufijo">h</span>
+              <span className="sufijo">min</span>
             </div>
             <div>
               <label className="solo-lectores" htmlFor={`mo-v-${l.id}`}>
@@ -452,12 +490,12 @@ function CampoManoDeObra({
                 inputMode="decimal"
                 value={texto(l.valorHora)}
                 onChange={(e) => editar(l.id, { valorHora: aNumero(e.target.value) })}
-                placeholder="$ por hora"
+                placeholder="$ la hora"
               />
             </div>
             <div className="linea-fila">
               <span className="linea-costo cifra">
-                {plata((l.horas ?? 0) * (l.valorHora ?? 0))}
+                {plata(costoDeTiempo(l.minutos, l.valorHora))}
               </span>
               <button
                 type="button"
@@ -475,6 +513,13 @@ function CampoManoDeObra({
           <Icono nombre="mas" tam={18} />
           Agregar mano de obra
         </button>
+
+        {receta.manoDeObra.length > 0 ? (
+          <p className="nota">
+            El tiempo va en minutos y la tarifa por hora, que es como se piensa: 40
+            minutos a $4.000 la hora son $2.666,67.
+          </p>
+        ) : null}
       </div>
     </section>
   )
@@ -488,7 +533,7 @@ function CampoExtras({
   subtotal,
 }: {
   receta: Receta
-  cambiar: (p: Partial<Receta>) => void
+  cambiar: Cambiar
   subtotal: number
 }) {
   const agregar = () =>
@@ -499,25 +544,26 @@ function CampoExtras({
       extras: receta.extras.map((l) => (l.id === lineaId ? { ...l, ...parcial } : l)),
     })
 
-  const quitar = (lineaId: string) =>
-    cambiar({ extras: receta.extras.filter((l) => l.id !== lineaId) })
+  const quitarYa = (lineaId: string) =>
+    cambiar((r) => ({ extras: r.extras.filter((l) => l.id !== lineaId) }))
+  const { pedirSalida: quitar, clase: claseSalida } = useSalida(quitarYa)
 
   return (
     <section className="campo campo--extras">
       <div className="campo-cabeza">
         <h2>Packaging y gastos extras</h2>
-        <span className="campo-subtotal cifra">{plata(subtotal)}</span>
+        <CifraAnimada className="campo-subtotal" valor={subtotal} formato={plata} />
       </div>
       <div className="campo-cuerpo">
         {receta.extras.length === 0 ? (
-          <p className="bajada" style={{ margin: 0, fontSize: 14 }}>
+          <p className="nota">
             Cajas, bandejas, cintas, envío, publicidad. Todo lo que pagás aparte de los
             ingredientes.
           </p>
         ) : null}
 
         {receta.extras.map((l) => (
-          <div key={l.id} className="linea linea--extra">
+          <div key={l.id} className={`linea linea--extra${claseSalida(l.id)}`}>
             <div>
               <label className="solo-lectores" htmlFor={`ex-c-${l.id}`}>
                 Concepto
@@ -574,7 +620,7 @@ function CampoMargen({
   costeo,
 }: {
   receta: Receta
-  cambiar: (p: Partial<Receta>) => void
+  cambiar: Cambiar
   costeo: ReturnType<typeof costear>
 }) {
   return (
@@ -606,14 +652,11 @@ function CampoMargen({
             <button
               key={m}
               type="button"
-              className="boton boton--chico boton--fantasma"
+              className={`boton boton--chico${
+                Math.abs(receta.margen - m) < 0.001 ? ' boton--activo' : ' boton--fantasma'
+              }`}
               onClick={() => cambiar({ margen: m })}
               aria-pressed={Math.abs(receta.margen - m) < 0.001}
-              style={
-                Math.abs(receta.margen - m) < 0.001
-                  ? { background: 'var(--grafito)', color: 'var(--tinta-sobre-esmalte)', borderColor: 'var(--rim)' }
-                  : undefined
-              }
             >
               {porcentaje(m)}
             </button>
@@ -628,6 +671,55 @@ function CampoMargen({
             <strong>{porcentaje(costeo.margenSobreVenta)}</strong> de ganancia real.
           </span>
         </div>
+      </div>
+    </section>
+  )
+}
+
+// ─── Procedimiento ───────────────────────────────────────────────────────────
+
+function CampoProcedimiento({
+  receta,
+  cambiar,
+}: {
+  receta: Receta
+  cambiar: Cambiar
+}) {
+  const lineas = receta.procedimiento.split('\n').filter((l) => l.trim()).length
+
+  return (
+    <section className="campo campo--datos">
+      <header className="campo-cabeza">
+        <h2>Procedimiento</h2>
+        {lineas > 0 ? (
+          <span className="nota">
+            {lineas} {lineas === 1 ? 'paso' : 'pasos'}
+          </span>
+        ) : null}
+      </header>
+      <div className="campo-cuerpo">
+        <label className="solo-lectores" htmlFor="procedimiento">
+          Procedimiento de la receta
+        </label>
+        <textarea
+          id="procedimiento"
+          className="entrada"
+          value={receta.procedimiento}
+          onChange={(e) => cambiar({ procedimiento: e.target.value })}
+          placeholder={
+            'Escribí los pasos como los tengas en la cabeza. Por ejemplo:\n\n' +
+            'Batir la manteca con el azúcar hasta que quede cremoso.\n' +
+            'Agregar los huevos de a uno.\n' +
+            'Incorporar la harina tamizada en tres veces.\n' +
+            'Horno 180° por 40 minutos.'
+          }
+          rows={10}
+          spellCheck
+        />
+        <p className="nota">
+          Texto libre, como lo escribirías en un cuaderno. Después lo vas a poder buscar
+          desde el recetario.
+        </p>
       </div>
     </section>
   )
@@ -668,7 +760,7 @@ function Resumen({
         <div className="total-renglon total-renglon--fuerte">
           <span>Costo total de producción</span>
         </div>
-        <span className="total-grande">{plata(costeo.total)}</span>
+        <CifraAnimada className="total-grande" valor={costeo.total} formato={plata} />
         {costeo.costoPorPorcion !== null ? (
           <div className="total-renglon" style={{ marginTop: 8 }}>
             <span>Costo por porción</span>
@@ -685,7 +777,7 @@ function Resumen({
         <div className="total-renglon total-renglon--fuerte">
           <span>Precio de venta sugerido</span>
         </div>
-        <span className="total-grande">{plata(costeo.precioVenta)}</span>
+        <CifraAnimada className="total-grande" valor={costeo.precioVenta} formato={plata} />
         {costeo.precioPorPorcion !== null ? (
           <div className="total-renglon" style={{ marginTop: 8 }}>
             <span>Precio por porción</span>
@@ -694,22 +786,22 @@ function Resumen({
         ) : null}
       </div>
 
-      <div className="total-seccion">
+      <div className="total-seccion total-pie">
         <button
           type="button"
-          className="boton boton--principal"
+          className="boton boton--ancho"
           onClick={guardar}
           disabled={!puedeGuardar}
-          style={{ width: '100%', background: 'var(--crema)', color: 'var(--tinta)' }}
         >
-          <Icono nombre={guardado ? 'listo' : 'guardar'} tam={18} />
+          <Icono
+            nombre={guardado ? 'listo' : 'guardar'}
+            tam={18}
+            className={guardado ? 'icono-dibuja' : undefined}
+          />
           {guardando ? 'Guardando…' : guardado ? 'Receta guardada' : 'Guardar receta'}
         </button>
         {!receta.nombre.trim() ? (
-          <p
-            className="total-renglon"
-            style={{ marginTop: 8, display: 'block', fontSize: 13 }}
-          >
+          <p className="nota nota--sobre-oscuro">
             Poné un nombre arriba para poder guardarla.
           </p>
         ) : null}

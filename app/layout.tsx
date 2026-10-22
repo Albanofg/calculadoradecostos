@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Archivo } from 'next/font/google'
 import { NavPrincipal } from '@/components/NavPrincipal.tsx'
+import { Transicion } from '@/components/Transicion.tsx'
 import './globals.css'
 
 const archivo = Archivo({
@@ -20,7 +21,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#ede6d8',
+  themeColor: '#f4f4f4',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -28,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es-AR" className={archivo.variable}>
       <body>
         <NavPrincipal />
-        {children}
+        <Transicion>{children}</Transicion>
       </body>
     </html>
   )

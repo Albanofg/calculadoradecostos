@@ -52,8 +52,19 @@ export type LineaIngrediente = {
 export type LineaManoDeObra = {
   id: string
   concepto: string
-  horas: number | null
+  /** Minutos trabajados. La tarifa sigue siendo por hora. */
+  minutos: number | null
   valorHora: number | null
+}
+
+/** Minutos a plata, con la tarifa por hora. */
+export const costoDeTiempo = (
+  minutos: number | null,
+  valorHora: number | null,
+): number => {
+  const m = typeof minutos === 'number' && Number.isFinite(minutos) ? minutos : 0
+  const v = typeof valorHora === 'number' && Number.isFinite(valorHora) ? valorHora : 0
+  return (m / 60) * v
 }
 
 export type LineaExtra = {
@@ -62,11 +73,25 @@ export type LineaExtra = {
   monto: number | null
 }
 
+/**
+ * El cliente recibe sólo el id: la imagen se pide aparte a /api/foto/<id>, que
+ * la sirve cacheada. Mandar el base64 dentro de la página haría que listar
+ * veinte recetas pesara megas.
+ */
+export type Foto = {
+  id: string
+  epigrafe: string
+}
+
+export const urlFoto = (id: string): string => `/api/foto/${id}`
+
 export type Receta = {
   id: string
   numero: number
   nombre: string
   descripcion: string
+  /** Los pasos, en texto libre. Es la parte "recetario", no la de costos. */
+  procedimiento: string
   /** "Cantidad que rinde (porciones / unidades)". */
   rinde: number | null
   /** Markup sobre el costo, como fracción: 0.5 = 50%. */
@@ -75,6 +100,7 @@ export type Receta = {
   ingredientes: LineaIngrediente[]
   manoDeObra: LineaManoDeObra[]
   extras: LineaExtra[]
+  fotos: Foto[]
 }
 
 export type CostoLinea = {
@@ -143,7 +169,7 @@ export function costear(receta: Receta, catalogo: Map<string, Ingrediente>): Cos
 
   const ingredientes = lineas.reduce((acc, l) => acc + l.costo, 0)
   const manoDeObra = receta.manoDeObra.reduce(
-    (acc, l) => acc + num(l.horas) * num(l.valorHora),
+    (acc, l) => acc + costoDeTiempo(l.minutos, l.valorHora),
     0,
   )
   const extras = receta.extras.reduce((acc, l) => acc + num(l.monto), 0)
@@ -178,7 +204,7 @@ export function costear(receta: Receta, catalogo: Map<string, Ingrediente>): Cos
 /**
  * Escalar una receta a un rinde nuevo.
  *
- * Multiplica las cantidades de ingredientes y las horas de mano de obra por el
+ * Multiplica las cantidades de ingredientes y los minutos de mano de obra por el
  * factor. Los extras NO se escalan automáticamente: una caja más grande no
  * cuesta el doble, y duplicar el envío sería mentira. Quedan como estaban para
  * que ella los revise.
@@ -197,7 +223,7 @@ export function escalar(receta: Receta, rindeNuevo: number): Receta {
     })),
     manoDeObra: receta.manoDeObra.map((l) => ({
       ...l,
-      horas: l.horas === null ? null : redondear(l.horas * factor),
+      minutos: l.minutos === null ? null : redondear(l.minutos * factor),
     })),
   }
 }
