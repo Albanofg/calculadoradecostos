@@ -26,6 +26,8 @@ export type Nombre =
   | 'libro'
   | 'cruz'
   | 'volver'
+  | 'sube'
+  | 'baja'
 
 /** Un solo sistema de trazo: 1.75px, puntas rectas, sin relleno. */
 const TRAZOS: Record<Nombre, React.ReactNode> = {
@@ -110,6 +112,8 @@ const TRAZOS: Record<Nombre, React.ReactNode> = {
   ),
   cruz: <path d="M6 6l12 12M18 6L6 18" />,
   volver: <path d="M19 12H5m0 0l6-6m-6 6l6 6" />,
+  sube: <path d="M12 19V5m0 0l-6 6m6-6l6 6" />,
+  baja: <path d="M12 5v14m0 0l-6-6m6 6l6-6" />,
 }
 
 export function Icono({ nombre, tam = 20, className }: Props) {

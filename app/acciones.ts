@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import type { Receta, Unidad } from '@/lib/costeo.ts'
-import { UNIDADES } from '@/lib/costeo.ts'
+import { UNIDADES, type UnidadPaquete } from '@/lib/costeo.ts'
 import {
   actualizarIngrediente,
   actualizarPrecio,
@@ -94,12 +94,21 @@ export async function accionEditarIngrediente(
   return { ok: true }
 }
 
-/** El caso rápido: cambiar sólo el precio y refrescar la fecha. */
-export async function accionActualizarPrecio(id: string, precio: number): Promise<Resultado> {
+/**
+ * El caso rápido: cambiar sólo el precio y refrescar la fecha.
+ *
+ * `paquete` es lo que ella realmente pagó ("5 kg a $23.000"); el precio por
+ * kilo sale de ahí. Se guarda para poder volver a mostrárselo tal cual.
+ */
+export async function accionActualizarPrecio(
+  id: string,
+  precio: number,
+  paquete?: { cantidad: number; precio: number; unidad: UnidadPaquete } | null,
+): Promise<Resultado> {
   if (!Number.isFinite(precio) || precio < 0) {
     return { ok: false, error: 'Precio inválido.' }
   }
-  await actualizarPrecio(id, precio)
+  await actualizarPrecio(id, precio, paquete ?? null)
   revalidatePath('/ingredientes')
   revalidatePath('/')
   revalidatePath('/presupuesto')

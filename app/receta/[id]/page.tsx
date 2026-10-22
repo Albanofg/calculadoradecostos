@@ -4,7 +4,7 @@ import { Calculadora } from '@/components/Calculadora.tsx'
 import { FaltaBase } from '@/components/FaltaBase.tsx'
 import { Icono } from '@/components/Icono.tsx'
 import { faltaConfiguracion } from '@/lib/db.ts'
-import { listarIngredientes, obtenerReceta } from '@/lib/datos.ts'
+import { listarIngredientes, listarPreparaciones, obtenerReceta } from '@/lib/datos.ts'
 import { fecha } from '@/lib/format.ts'
 
 export const dynamic = 'force-dynamic'
@@ -16,7 +16,11 @@ export default async function PaginaReceta({
 }) {
   if (faltaConfiguracion()) return <FaltaBase />
   const { id } = await params
-  const [receta, catalogo] = await Promise.all([obtenerReceta(id), listarIngredientes()])
+  const [receta, catalogo, preparaciones] = await Promise.all([
+    obtenerReceta(id),
+    listarIngredientes(),
+    listarPreparaciones(),
+  ])
   if (!receta) notFound()
 
   return (
@@ -31,7 +35,7 @@ export default async function PaginaReceta({
         con los precios de hoy, así que el precio de venta puede haber cambiado desde que la
         guardaste.
       </p>
-      <Calculadora inicial={receta} catalogo={catalogo} />
+      <Calculadora inicial={receta} catalogo={catalogo} preparaciones={preparaciones} />
     </main>
   )
 }

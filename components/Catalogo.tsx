@@ -2,8 +2,16 @@
 
 import { useActionState, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { UNIDADES, type Ingrediente, type Unidad } from '@/lib/costeo.ts'
-import { FRESCURA_TEXTO, fecha, frescura, plataRedonda } from '@/lib/format.ts'
+import {
+  PAQUETE_TEXTO,
+  PAQUETES_POSIBLES,
+  precioUnitarioDePaquete,
+  UNIDADES,
+  type Ingrediente,
+  type Unidad,
+  type UnidadPaquete,
+} from '@/lib/costeo.ts'
+import { cantidad, FRESCURA_TEXTO, fecha, frescura, plataRedonda } from '@/lib/format.ts'
 import {
   accionActualizarPrecio,
   accionBorrarIngrediente,
@@ -12,6 +20,15 @@ import {
   type Resultado,
 } from '@/app/acciones.ts'
 import { Icono } from './Icono.tsx'
+
+/** Acepta "1.250,5" y "1250.5" por igual. */
+function aNumero(v: string): number | null {
+  const limpio = v.trim().replace(/\s/g, '')
+  if (limpio === '') return null
+  const normal = limpio.includes(',') ? limpio.replace(/\./g, '').replace(',', '.') : limpio
+  const x = Number(normal)
+  return Number.isFinite(x) ? x : null
+}
 
 const ETIQUETA_UNIDAD: Record<Unidad, string> = {
   KG: 'por kilo',
@@ -176,19 +193,54 @@ function FichaIngrediente({
   ingrediente: Ingrediente
   onEditar: () => void
 }) {
+  // Por paquete es el modo por defecto: es como se compra. El precio por kilo
+  // se calcula solo, así ella no tiene que hacer la división de cabeza.
+  const [porPaquete, setPorPaquete] = useState(true)
   const [precio, setPrecio] = useState('')
+  const [cantidadPaquete, setCantidadPaquete] = useState('')
+  const [precioPaquete, setPrecioPaquete] = useState('')
+  // Los paquetes de pastelería vienen en gramos más seguido que en kilos, así
+  // que la unidad chica es la que arranca elegida.
+  const unidadesPosibles = PAQUETES_POSIBLES[ingrediente.unidad]
+  const [unidadPaquete, setUnidadPaquete] = useState<UnidadPaquete>(
+    ingrediente.paqueteUnidad ?? unidadesPosibles[0],
+  )
   const [guardando, iniciar] = useTransition()
   const router = useRouter()
   const estado = frescura(ingrediente.precioConfirmado, ingrediente.actualizado)
 
+  const unitarioCalculado = precioUnitarioDePaquete(
+    aNumero(precioPaquete),
+    aNumero(cantidadPaquete),
+    unidadPaquete,
+  )
+
+  const listo = porPaquete ? unitarioCalculado !== null : aNumero(precio) !== null
+
   const guardarPrecio = () => {
-    const v = Number(precio.replace(/\./g, '').replace(',', '.'))
-    if (!Number.isFinite(v) || v < 0) return
+    const unitario = porPaquete ? unitarioCalculado : aNumero(precio)
+    if (unitario === null || unitario < 0) return
     iniciar(async () => {
-      await accionActualizarPrecio(ingrediente.id, v)
+      await accionActualizarPrecio(
+        ingrediente.id,
+        unitario,
+        porPaquete
+          ? {
+              cantidad: aNumero(cantidadPaquete)!,
+              precio: aNumero(precioPaquete)!,
+              unidad: unidadPaquete,
+            }
+          : null,
+      )
       setPrecio('')
+      setCantidadPaquete('')
+      setPrecioPaquete('')
       router.refresh()
     })
+  }
+
+  const enEnter = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && listo) guardarPrecio()
   }
 
   return (
@@ -210,8 +262,96 @@ function FichaIngrediente({
         ) : null}
       </div>
 
-      <div className="linea-fila">
-        <div className="con-sufijo con-sufijo--crece">
+      {/* Lo que pagó la última vez, para que no tenga que acordarse. */}
+      {ingrediente.paqueteCantidad && ingrediente.paquetePrecio ? (
+        <p className="nota">
+          Último: {cantidad(ingrediente.paqueteCantidad)}{' '}
+          {PAQUETE_TEXTO[ingrediente.paqueteUnidad ?? ingrediente.unidad]} a{' '}
+          {plataRedonda(ingrediente.paquetePrecio)}
+        </p>
+      ) : null}
+
+      <div className="modo-precio">
+        <button
+          type="button"
+          className={`boton boton--chico${porPaquete ? ' boton--activo' : ' boton--fantasma'}`}
+          onClick={() => setPorPaquete(true)}
+          aria-pressed={porPaquete}
+        >
+          Por paquete
+        </button>
+        <button
+          type="button"
+          className={`boton boton--chico${!porPaquete ? ' boton--activo' : ' boton--fantasma'}`}
+          onClick={() => setPorPaquete(false)}
+          aria-pressed={!porPaquete}
+        >
+          {ETIQUETA_UNIDAD[ingrediente.unidad].replace('por ', 'Por ')}
+        </button>
+      </div>
+
+      {porPaquete ? (
+        <>
+          <div className="linea-fila">
+            <div className="con-sufijo con-sufijo--crece">
+              <label className="solo-lectores" htmlFor={`paq-cant-${ingrediente.id}`}>
+                Cuánto venía el paquete de {ingrediente.nombre}
+              </label>
+              <input
+                id={`paq-cant-${ingrediente.id}`}
+                className="entrada entrada--numero"
+                inputMode="decimal"
+                value={cantidadPaquete}
+                onChange={(e) => setCantidadPaquete(e.target.value)}
+                onKeyDown={enEnter}
+                placeholder="Cuánto venía"
+              />
+              {unidadesPosibles.length > 1 ? (
+                <>
+                  <label className="solo-lectores" htmlFor={`paq-u-${ingrediente.id}`}>
+                    En qué unidad venía
+                  </label>
+                  <select
+                    id={`paq-u-${ingrediente.id}`}
+                    className="selector sufijo-unidad"
+                    value={unidadPaquete}
+                    onChange={(e) => setUnidadPaquete(e.target.value as UnidadPaquete)}
+                  >
+                    {unidadesPosibles.map((u) => (
+                      <option key={u} value={u}>
+                        {PAQUETE_TEXTO[u]}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : (
+                <span className="sufijo">{PAQUETE_TEXTO[unidadPaquete]}</span>
+              )}
+            </div>
+            <div className="con-sufijo con-sufijo--crece">
+              <label className="solo-lectores" htmlFor={`paq-precio-${ingrediente.id}`}>
+                Cuánto pagaste por el paquete de {ingrediente.nombre}
+              </label>
+              <input
+                id={`paq-precio-${ingrediente.id}`}
+                className="entrada entrada--numero"
+                inputMode="decimal"
+                value={precioPaquete}
+                onChange={(e) => setPrecioPaquete(e.target.value)}
+                onKeyDown={enEnter}
+                placeholder="Cuánto pagaste"
+              />
+            </div>
+          </div>
+          {unitarioCalculado !== null ? (
+            <p className="nota nota--calculo">
+              Te queda a <strong className="cifra">{plataRedonda(unitarioCalculado)}</strong>{' '}
+              {ETIQUETA_UNIDAD[ingrediente.unidad]}.
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <div className="con-sufijo">
           <label className="solo-lectores" htmlFor={`precio-${ingrediente.id}`}>
             Precio {ETIQUETA_UNIDAD[ingrediente.unidad]} de {ingrediente.nombre}
           </label>
@@ -221,21 +361,20 @@ function FichaIngrediente({
             inputMode="decimal"
             value={precio}
             onChange={(e) => setPrecio(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') guardarPrecio()
-            }}
-            placeholder={
-              ingrediente.precioConfirmado ? 'Nuevo precio' : 'Poné el precio'
-            }
+            onKeyDown={enEnter}
+            placeholder={ingrediente.precioConfirmado ? 'Nuevo precio' : 'Poné el precio'}
           />
         </div>
+      )}
+
+      <div className="linea-fila">
         <button
           type="button"
-          className="boton boton--chico"
+          className="boton boton--chico empuja"
           onClick={guardarPrecio}
-          disabled={precio.trim() === '' || guardando}
+          disabled={!listo || guardando}
         >
-          {guardando ? '…' : 'Guardar'}
+          {guardando ? 'Guardando…' : 'Guardar precio'}
         </button>
         <button
           type="button"

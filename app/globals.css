@@ -1084,6 +1084,14 @@ textarea.entrada {
   margin-bottom: var(--e5);
 }
 
+/* El filtro del catálogo entra entero en el teléfono en vez de quedar apretado
+   al lado del buscador. */
+@media (max-width: 639px) {
+  .herramientas > .boton {
+    width: 100%;
+  }
+}
+
 .buscador {
   position: relative;
   flex: 1 1 260px;
@@ -1619,12 +1627,15 @@ textarea.entrada {
   min-width: 0;
 }
 
-/* Encabezado con la acción principal al costado. */
+/* Encabezado con la acción principal al costado.
+   En el teléfono se apila, así que el margen de la bajada se saca y el espacio
+   lo pone el gap: si no, el botón queda pegado a lo que viene abajo. */
 .cabecera-pagina {
   display: flex;
   align-items: flex-start;
   gap: var(--e4);
   flex-wrap: wrap;
+  margin-bottom: var(--e5);
 }
 
 .cabecera-pagina > div {
@@ -1632,9 +1643,26 @@ textarea.entrada {
   min-width: 0;
 }
 
+.cabecera-pagina .bajada {
+  margin-bottom: 0;
+}
+
 .cabecera-pagina .boton {
   flex: none;
-  margin-top: var(--e2);
+}
+
+/* En pantalla angosta la acción principal ocupa el ancho: es más fácil de
+   acertar con el pulgar que un botón chico arriba a la derecha. */
+@media (max-width: 639px) {
+  .cabecera-pagina .boton {
+    width: 100%;
+  }
+}
+
+@media (min-width: 640px) {
+  .cabecera-pagina .boton {
+    margin-top: var(--e1);
+  }
 }
 
 /* Volver al recetario, arriba de todo. */
@@ -1717,4 +1745,247 @@ textarea.entrada {
     padding-inline: var(--e3);
     font-size: 13.5px;
   }
+}
+
+/* ─── Modo de carga de precio ────────────────────────────────────────────── */
+
+.modo-precio {
+  display: flex;
+  gap: var(--e1);
+  background: var(--superficie-3);
+  padding: 3px;
+  border-radius: 999px;
+}
+
+.modo-precio .boton {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 999px;
+  box-shadow: none;
+  font-size: 13px;
+  min-height: 36px;
+  border-color: transparent;
+}
+
+.modo-precio .boton--activo {
+  box-shadow: var(--sombra-1);
+}
+
+/* El resultado de una cuenta que la app hizo por ella. */
+.nota--calculo {
+  padding: var(--e2) var(--e3);
+  border-radius: var(--radio-micro);
+  background: var(--acento-tenue);
+  color: var(--violeta-hondo);
+}
+
+/* ─── Precio final, dentro de la caja oscura ─────────────────────────────── */
+
+.precio-final-abrir {
+  margin-top: var(--e3);
+  background: rgba(253, 247, 251, 0.14);
+  border-color: transparent;
+  color: var(--tinta-sobre-oscuro);
+  box-shadow: none;
+}
+
+.precio-final-abrir:hover:not(:disabled) {
+  background: rgba(253, 247, 251, 0.22);
+  border-color: transparent;
+}
+
+.precio-final {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e2);
+  margin-top: var(--e4);
+  padding-top: var(--e4);
+  border-top: 1px solid rgba(253, 247, 251, 0.16);
+}
+
+.precio-final .entrada {
+  background: rgba(253, 247, 251, 0.1);
+  border-color: rgba(253, 247, 251, 0.24);
+  color: var(--tinta-sobre-oscuro);
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.precio-final .entrada::placeholder {
+  color: var(--tinta-sobre-oscuro-suave);
+}
+
+.precio-final .entrada:focus {
+  border-color: var(--flor);
+  box-shadow: 0 0 0 3px rgba(246, 189, 209, 0.22);
+}
+
+.precio-final .boton {
+  background: rgba(253, 247, 251, 0.14);
+  border-color: transparent;
+  color: var(--tinta-sobre-oscuro);
+  box-shadow: none;
+  font-size: 12.5px;
+}
+
+.precio-final .boton:hover {
+  background: rgba(253, 247, 251, 0.24);
+  border-color: transparent;
+}
+
+.etiqueta--sobre-oscuro {
+  color: var(--tinta-sobre-oscuro-suave);
+}
+
+/* ─── Tramos por cantidad ────────────────────────────────────────────────── */
+
+@media (min-width: 768px) {
+  .linea--tramo {
+    grid-template-columns: 130px minmax(0, 1fr) 150px;
+    align-items: center;
+  }
+}
+
+/* El detalle del tramo ocupa el ancho completo, debajo de los campos. */
+.tramo-detalle {
+  grid-column: 1 / -1;
+  padding-top: var(--e1);
+}
+
+.marca-descuento {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--flor);
+  color: var(--violeta-hondo);
+  font-size: 11.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+/* ─── Interruptor ────────────────────────────────────────────────────────── */
+
+.interruptor {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--e3);
+  padding: var(--e3);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+  background: var(--superficie-2);
+  cursor: pointer;
+  transition: border-color var(--vel-2) var(--ease-suave), background var(--vel-2) var(--ease-suave);
+}
+
+.interruptor:hover {
+  border-color: var(--borde-fuerte);
+}
+
+.interruptor:has(input:checked) {
+  border-color: var(--acento);
+  background: var(--acento-tenue);
+}
+
+.interruptor input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--violeta);
+  cursor: pointer;
+}
+
+.interruptor > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.interruptor strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ─── Lista de cambios de precio ─────────────────────────────────────────── */
+
+.lista-cambios {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lista-cambios li {
+  display: flex;
+  align-items: center;
+  gap: var(--e3);
+  flex-wrap: wrap;
+  padding: var(--e2) var(--e3);
+  border-radius: var(--radio-micro);
+  background: var(--superficie-2);
+}
+
+.cambio-nombre {
+  font-weight: 600;
+  font-size: 14.5px;
+  color: var(--tinta);
+  text-decoration: none;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+a.cambio-nombre:hover {
+  color: var(--violeta);
+  text-decoration: underline;
+}
+
+.cambio-cifras {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.cambio-cifras svg {
+  color: var(--tinta-suave);
+}
+
+/* El precio viejo se tacha: ya no vale. */
+.cambio-antes {
+  color: var(--tinta-suave);
+  text-decoration: line-through;
+}
+
+/* Selector de unidad pegado al campo de cantidad del paquete: ocupa el lugar
+   del sufijo, pero se puede cambiar. */
+.sufijo-unidad {
+  position: absolute;
+  right: 4px;
+  width: auto;
+  min-height: 36px;
+  padding: 0 26px 0 8px;
+  border: none;
+  background-color: var(--superficie-3);
+  border-radius: var(--radio-micro);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tinta-media);
+  background-position: right 7px center;
+  cursor: pointer;
+}
+
+.sufijo-unidad:focus {
+  box-shadow: none;
+  outline: 2px solid var(--acento);
+  outline-offset: 1px;
+}
+
+.con-sufijo:has(.sufijo-unidad) .entrada {
+  padding-right: 72px;
 }

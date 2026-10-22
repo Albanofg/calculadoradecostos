@@ -6,6 +6,8 @@ import Link from 'next/link'
 import {
   costear,
   costoDeTiempo,
+  RINDE_TEXTO,
+  UNIDADES_RINDE,
   escalar,
   UNIDAD_DE_USO,
   type Foto,
@@ -20,6 +22,14 @@ import { Icono } from './Icono.tsx'
 import { useSalida } from './useSalida.ts'
 
 const id = () => Math.random().toString(36).slice(2, 11)
+
+/** El sufijo que va al lado del campo de cantidad de una preparación. */
+const UNIDAD_CORTA: Record<Receta['rindeUnidad'], string> = {
+  PORCION: 'porc',
+  G: 'g',
+  ML: 'ml',
+  UNIDAD: 'un',
+}
 
 /**
  * Aceptar una función además de un objeto importa para los borrados: la baja
@@ -45,9 +55,12 @@ const texto = (v: number | null) => (v === null ? '' : String(v))
 export function Calculadora({
   inicial,
   catalogo,
+  preparaciones = [],
 }: {
   inicial: Receta
   catalogo: Ingrediente[]
+  /** Las recetas marcadas como preparación, para poder usarlas adentro. */
+  preparaciones?: Receta[]
 }) {
   const [receta, setReceta] = useState<Receta>(inicial)
   const [guardando, iniciarGuardado] = useTransition()
@@ -55,7 +68,14 @@ export function Calculadora({
   const router = useRouter()
 
   const porId = useMemo(() => new Map(catalogo.map((i) => [i.id, i])), [catalogo])
-  const costeo = useMemo(() => costear(receta, porId), [receta, porId])
+  const recetario = useMemo(
+    () => new Map(preparaciones.map((r) => [r.id, r])),
+    [preparaciones],
+  )
+  const costeo = useMemo(
+    () => costear(receta, porId, recetario),
+    [receta, porId, recetario],
+  )
 
   const cambiar: Cambiar = (parcial) => {
     setReceta((r) => ({ ...r, ...(typeof parcial === 'function' ? parcial(r) : parcial) }))
@@ -86,11 +106,20 @@ export function Calculadora({
           costeo={costeo}
         />
 
+        <CampoPreparaciones
+          receta={receta}
+          cambiar={cambiar}
+          preparaciones={preparaciones}
+          costeo={costeo}
+        />
+
         <CampoManoDeObra receta={receta} cambiar={cambiar} subtotal={costeo.manoDeObra} />
 
         <CampoExtras receta={receta} cambiar={cambiar} subtotal={costeo.extras} />
 
         <CampoMargen receta={receta} cambiar={cambiar} costeo={costeo} />
+
+        <CampoTramos receta={receta} cambiar={cambiar} costeo={costeo} />
 
         <CampoProcedimiento receta={receta} cambiar={cambiar} />
 
@@ -105,6 +134,7 @@ export function Calculadora({
         <Resumen
           costeo={costeo}
           receta={receta}
+          cambiar={cambiar}
           guardar={guardar}
           puedeGuardar={puedeGuardar}
           guardando={guardando}
@@ -202,19 +232,63 @@ function DatosDeLaReceta({
           />
         </div>
 
-        <div>
-          <label className="etiqueta" htmlFor="receta-rinde">
-            Cantidad que rinde (porciones o unidades)
-          </label>
-          <input
-            id="receta-rinde"
-            className="entrada entrada--numero"
-            inputMode="decimal"
-            value={texto(receta.rinde)}
-            onChange={(e) => cambiar({ rinde: aNumero(e.target.value) })}
-            placeholder="0"
-          />
+        <div className="grupo-campos">
+          <div className="grupo-campo">
+            <label className="etiqueta" htmlFor="receta-rinde">
+              {receta.esPreparacion ? 'Cuánto rinde esta preparación' : 'Cantidad que rinde'}
+            </label>
+            <input
+              id="receta-rinde"
+              className="entrada entrada--numero"
+              inputMode="decimal"
+              value={texto(receta.rinde)}
+              onChange={(e) => cambiar({ rinde: aNumero(e.target.value) })}
+              placeholder="0"
+            />
+          </div>
+          <div className="grupo-campo">
+            <label className="etiqueta" htmlFor="receta-rinde-unidad">
+              En qué
+            </label>
+            <select
+              id="receta-rinde-unidad"
+              className="selector"
+              value={receta.rindeUnidad}
+              onChange={(e) =>
+                cambiar({ rindeUnidad: e.target.value as Receta['rindeUnidad'] })
+              }
+            >
+              {UNIDADES_RINDE.map((u) => (
+                <option key={u} value={u}>
+                  {RINDE_TEXTO[u]}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+
+        {/* Una preparación no se vende sola: se usa adentro de otras recetas.
+            Por eso rinde gramos o mililitros en vez de porciones. */}
+        <label className="interruptor">
+          <input
+            type="checkbox"
+            checked={receta.esPreparacion}
+            onChange={(e) => {
+              const es = e.target.checked
+              cambiar({
+                esPreparacion: es,
+                rindeUnidad: es && receta.rindeUnidad === 'PORCION' ? 'G' : receta.rindeUnidad,
+              })
+            }}
+          />
+          <span>
+            <strong>Es una preparación</strong>
+            <span className="nota">
+              Un relleno, una crema, un almíbar: algo que usás adentro de otras recetas en
+              vez de vender suelto.
+            </span>
+          </span>
+        </label>
 
         {receta.rinde && receta.rinde > 0 ? (
           <div className="linea-fila linea-fila--envuelve">
@@ -399,6 +473,134 @@ function CampoIngredientes({
             </span>
           </div>
         ) : null}
+      </div>
+    </section>
+  )
+}
+
+// ─── Preparaciones ───────────────────────────────────────────────────────────
+
+/**
+ * Preparaciones usadas adentro de esta receta: un buttercream, un almíbar.
+ *
+ * El costo sale a prorrata de lo que rinde la preparación: si la crema rinde
+ * 500 g y cuesta $5.000, usar 200 g cuesta $2.000. Así no hay que recargar los
+ * ingredientes de la crema en cada torta que la lleva.
+ */
+function CampoPreparaciones({
+  receta,
+  cambiar,
+  preparaciones,
+  costeo,
+}: {
+  receta: Receta
+  cambiar: Cambiar
+  preparaciones: Receta[]
+  costeo: ReturnType<typeof costear>
+}) {
+  // Una receta no puede usarse a sí misma.
+  const disponibles = preparaciones.filter((p) => p.id !== receta.id)
+
+  const agregar = () =>
+    cambiar((r) => ({
+      subrecetas: [...r.subrecetas, { id: id(), subId: null, cantidad: null }],
+    }))
+
+  const editar = (lineaId: string, parcial: Partial<Receta['subrecetas'][number]>) =>
+    cambiar((r) => ({
+      subrecetas: r.subrecetas.map((l) => (l.id === lineaId ? { ...l, ...parcial } : l)),
+    }))
+
+  const quitarYa = (lineaId: string) =>
+    cambiar((r) => ({ subrecetas: r.subrecetas.filter((l) => l.id !== lineaId) }))
+  const { pedirSalida: quitar, clase: claseSalida } = useSalida(quitarYa)
+
+  // Si no hay preparaciones cargadas y esta receta no usa ninguna, la sección
+  // sobra: no tiene sentido mostrar un selector vacío.
+  if (disponibles.length === 0 && receta.subrecetas.length === 0) return null
+
+  return (
+    <section className="campo campo--ingredientes">
+      <header className="campo-cabeza">
+        <h2>Preparaciones</h2>
+        <CifraAnimada className="campo-subtotal" valor={costeo.preparaciones} formato={plata} />
+      </header>
+      <div className="campo-cuerpo">
+        {receta.subrecetas.map((linea) => {
+          const detalle = costeo.lineasSub.find((l) => l.linea.id === linea.id)
+          const sub = detalle?.sub ?? disponibles.find((p) => p.id === linea.subId) ?? null
+          const problema = detalle?.incierto && linea.cantidad
+          return (
+            <div
+              key={linea.id}
+              className={`linea linea--ingrediente${problema ? ' linea--incierta' : ''}${claseSalida(linea.id)}`}
+            >
+              <div>
+                <label className="solo-lectores" htmlFor={`sub-${linea.id}`}>
+                  Preparación
+                </label>
+                <select
+                  id={`sub-${linea.id}`}
+                  className="selector"
+                  value={linea.subId ?? ''}
+                  onChange={(e) => editar(linea.id, { subId: e.target.value || null })}
+                >
+                  <option value="">Elegí una preparación…</option>
+                  {disponibles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                      {p.rinde ? ` — rinde ${p.rinde} ${RINDE_TEXTO[p.rindeUnidad]}` : ' — sin rinde'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="con-sufijo">
+                <label className="solo-lectores" htmlFor={`sub-c-${linea.id}`}>
+                  Cuánto usás
+                </label>
+                <input
+                  id={`sub-c-${linea.id}`}
+                  className="entrada entrada--numero"
+                  inputMode="decimal"
+                  value={texto(linea.cantidad)}
+                  onChange={(e) => editar(linea.id, { cantidad: aNumero(e.target.value) })}
+                  placeholder="0"
+                />
+                <span className="sufijo">
+                  {sub ? UNIDAD_CORTA[sub.rindeUnidad] : '—'}
+                </span>
+              </div>
+
+              <div className="linea-fila">
+                {problema ? (
+                  <span className="linea-costo linea-costo--incierto">
+                    {detalle?.motivo === 'ciclo'
+                      ? 'Se usa a sí misma'
+                      : detalle?.motivo === 'sin-rinde'
+                        ? 'Falta el rinde'
+                        : 'Le falta un precio'}
+                  </span>
+                ) : (
+                  <span className="linea-costo cifra">{plata(detalle?.costo ?? 0)}</span>
+                )}
+                <button
+                  type="button"
+                  className="boton boton--chico boton--fantasma boton--peligro"
+                  onClick={() => quitar(linea.id)}
+                  aria-label="Quitar esta preparación"
+                >
+                  <Icono nombre="basura" tam={16} />
+                </button>
+              </div>
+            </div>
+          )
+        })}
+
+        <button type="button" className="boton boton--agregar" onClick={agregar}>
+          <Icono nombre="mas" tam={18} />
+          Agregar una preparación
+        </button>
       </div>
     </section>
   )
@@ -725,16 +927,230 @@ function CampoProcedimiento({
   )
 }
 
+// ─── Tramos por cantidad ─────────────────────────────────────────────────────
+
+/**
+ * "1 sale $5.000, pero 3 salen $12.000".
+ *
+ * El precio del tramo es el del combo entero, no el unitario, porque así se lo
+ * dice al cliente. El presupuesto saca el unitario dividiendo.
+ */
+function CampoTramos({
+  receta,
+  cambiar,
+  costeo,
+}: {
+  receta: Receta
+  cambiar: Cambiar
+  costeo: ReturnType<typeof costear>
+}) {
+  const agregar = () =>
+    cambiar((r) => ({
+      tramos: [
+        ...r.tramos,
+        {
+          id: id(),
+          desde: (r.tramos.at(-1)?.desde ?? 1) + 2,
+          precioTotal: 0,
+        },
+      ],
+    }))
+
+  const editar = (tramoId: string, parcial: Partial<Receta['tramos'][number]>) =>
+    cambiar((r) => ({
+      tramos: r.tramos.map((t) => (t.id === tramoId ? { ...t, ...parcial } : t)),
+    }))
+
+  const quitarYa = (tramoId: string) =>
+    cambiar((r) => ({ tramos: r.tramos.filter((t) => t.id !== tramoId) }))
+  const { pedirSalida: quitar, clase: claseSalida } = useSalida(quitarYa)
+
+  return (
+    <section className="campo campo--extras">
+      <header className="campo-cabeza">
+        <h2>Descuento por cantidad</h2>
+      </header>
+      <div className="campo-cuerpo">
+        <p className="nota">
+          Opcional. Si llevan varias, podés ponerles otro precio: una sale{' '}
+          {plata(costeo.precioVenta)}, pero tres pueden salir menos. El cliente lo ve en el
+          presupuesto.
+        </p>
+
+        {receta.tramos.map((t) => {
+          const unitario = t.desde > 0 ? t.precioTotal / t.desde : 0
+          const ahorro = costeo.precioVenta * t.desde - t.precioTotal
+          return (
+            <div key={t.id} className={`linea linea--tramo${claseSalida(t.id)}`}>
+              <div className="con-sufijo">
+                <label className="solo-lectores" htmlFor={`tr-d-${t.id}`}>
+                  A partir de cuántas unidades
+                </label>
+                <input
+                  id={`tr-d-${t.id}`}
+                  className="entrada entrada--numero"
+                  inputMode="numeric"
+                  value={t.desde || ''}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value.replace(/\D/g, ''), 10)
+                    editar(t.id, { desde: Number.isFinite(v) && v > 0 ? v : 1 })
+                  }}
+                />
+                <span className="sufijo">un</span>
+              </div>
+
+              <div>
+                <label className="solo-lectores" htmlFor={`tr-p-${t.id}`}>
+                  Precio de las {t.desde} juntas
+                </label>
+                <input
+                  id={`tr-p-${t.id}`}
+                  className="entrada entrada--numero"
+                  inputMode="decimal"
+                  value={t.precioTotal || ''}
+                  onChange={(e) => editar(t.id, { precioTotal: aNumero(e.target.value) ?? 0 })}
+                  placeholder="Precio de las dos"
+                />
+              </div>
+
+              <div className="linea-fila">
+                <span className="linea-costo cifra">{plata(unitario)}</span>
+                <button
+                  type="button"
+                  className="boton boton--chico boton--fantasma boton--peligro"
+                  onClick={() => quitar(t.id)}
+                  aria-label="Quitar este tramo"
+                >
+                  <Icono nombre="basura" tam={16} />
+                </button>
+              </div>
+
+              {t.precioTotal > 0 && costeo.precioVenta > 0 ? (
+                <p className="nota tramo-detalle">
+                  {t.desde} a {plata(t.precioTotal)} ={' '}
+                  <strong className="cifra">{plata(unitario)}</strong> cada una.{' '}
+                  {ahorro > 0
+                    ? `El cliente se ahorra ${plata(ahorro)}.`
+                    : ahorro < 0
+                      ? `Ojo: así sale ${plata(-ahorro)} más caro que de a una.`
+                      : 'Mismo precio que de a una.'}
+                </p>
+              ) : null}
+            </div>
+          )
+        })}
+
+        <button type="button" className="boton boton--agregar" onClick={agregar}>
+          <Icono nombre="mas" tam={18} />
+          Agregar un tramo
+        </button>
+      </div>
+    </section>
+  )
+}
+
+// ─── Precio final ────────────────────────────────────────────────────────────
+
+/**
+ * La app calcula y sugiere; el precio que cobra lo decide ella.
+ *
+ * Existe porque nadie cobra $20.125: cobra $20.000. Redondear a mano no debería
+ * obligarla a falsear el margen hasta que el sugerido dé redondo.
+ */
+function PrecioFinal({
+  receta,
+  cambiar,
+  costeo,
+}: {
+  receta: Receta
+  cambiar: Cambiar
+  costeo: ReturnType<typeof costear>
+}) {
+  const [abierto, setAbierto] = useState(costeo.esPrecioManual)
+
+  const redondearA = (multiplo: number) => {
+    const v = Math.round(costeo.precioSugerido / multiplo) * multiplo
+    cambiar({ precioManual: v > 0 ? v : null })
+    setAbierto(true)
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        className="boton boton--chico precio-final-abrir"
+        onClick={() => setAbierto(true)}
+        disabled={costeo.precioSugerido <= 0}
+      >
+        <Icono nombre="lapiz" tam={15} />
+        Poner otro precio
+      </button>
+    )
+  }
+
+  return (
+    <div className="precio-final">
+      <label className="etiqueta etiqueta--sobre-oscuro" htmlFor="precio-manual">
+        Precio que cobrás
+      </label>
+      <input
+        id="precio-manual"
+        className="entrada entrada--numero"
+        inputMode="decimal"
+        value={receta.precioManual === null ? '' : String(receta.precioManual)}
+        onChange={(e) => cambiar({ precioManual: aNumero(e.target.value) })}
+        placeholder={String(Math.round(costeo.precioSugerido))}
+      />
+
+      <div className="fila-acciones">
+        {[1000, 500, 100].map((m) => (
+          <button
+            key={m}
+            type="button"
+            className="boton boton--chico"
+            onClick={() => redondearA(m)}
+          >
+            Redondear a {m === 1000 ? '$1.000' : m === 500 ? '$500' : '$100'}
+          </button>
+        ))}
+        {costeo.esPrecioManual ? (
+          <button
+            type="button"
+            className="boton boton--chico"
+            onClick={() => {
+              cambiar({ precioManual: null })
+              setAbierto(false)
+            }}
+          >
+            Volver al sugerido
+          </button>
+        ) : null}
+      </div>
+
+      {costeo.esPrecioManual ? (
+        <p className="nota nota--sobre-oscuro">
+          La app sugería{' '}
+          <strong className="cifra">{plata(costeo.precioSugerido)}</strong>. Con lo que
+          cobrás te queda <strong>{porcentaje(costeo.margenSobreVenta)}</strong> de ganancia
+          real.
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 // ─── Resumen ─────────────────────────────────────────────────────────────────
 
 function Resumen({
   costeo,
   receta,
+  cambiar,
   guardar,
   puedeGuardar,
   guardando,
   guardado,
 }: {
+  cambiar: Cambiar
   costeo: ReturnType<typeof costear>
   receta: Receta
   guardar: () => void
@@ -775,9 +1191,11 @@ function Resumen({
           <span className="cifra">{plata(costeo.ganancia)}</span>
         </div>
         <div className="total-renglon total-renglon--fuerte">
-          <span>Precio de venta sugerido</span>
+          <span>{costeo.esPrecioManual ? 'Precio de venta' : 'Precio de venta sugerido'}</span>
         </div>
         <CifraAnimada className="total-grande" valor={costeo.precioVenta} formato={plata} />
+
+        <PrecioFinal receta={receta} cambiar={cambiar} costeo={costeo} />
         {costeo.precioPorPorcion !== null ? (
           <div className="total-renglon" style={{ marginTop: 8 }}>
             <span>Precio por porción</span>

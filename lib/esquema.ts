@@ -146,6 +146,101 @@ export const VERSIONES: Version[] = [
       `alter table receta_mano_obra drop column if exists horas`,
     ],
   },
+
+  {
+    /**
+     * Cinco cosas que se decidieron juntas, en una sola migración para no
+     * tocar la base en producción cinco veces seguidas.
+     */
+    version: 4,
+    sentencias: [
+      // 1. Precio del paquete. Ella compra "5 kg a $23.000", no "$4.600 el kilo".
+      //    Se guarda lo que pagó y cuánto venía; `precio` sigue siendo el
+      //    canónico por KG/LITRO/UNIDAD y se calcula a partir de esto.
+      `alter table ingredientes add column if not exists paquete_cantidad numeric(14, 3)`,
+      `alter table ingredientes add column if not exists paquete_precio numeric(14, 2)`,
+
+      // 2. El precio final lo decide ella. La app sugiere; esto es lo que cobra.
+      //    null = usar el sugerido.
+      `alter table recetas add column if not exists precio_manual numeric(14, 2)`,
+
+      // 3. Preparaciones usadas dentro de otras recetas (un buttercream que va
+      //    en cinco tortas). Una preparación rinde una cantidad en gramos o
+      //    mililitros, no en porciones.
+      `alter table recetas add column if not exists es_preparacion boolean not null default false`,
+      `alter table recetas add column if not exists rinde_unidad text not null default 'PORCION'`,
+      `alter table recetas drop constraint if exists recetas_rinde_unidad_check`,
+      `alter table recetas add constraint recetas_rinde_unidad_check
+         check (rinde_unidad in ('PORCION', 'G', 'ML', 'UNIDAD'))`,
+
+      `create table if not exists receta_subrecetas (
+         id        text primary key,
+         receta_id text not null references recetas (id) on delete cascade,
+         sub_id    text not null references recetas (id) on delete cascade,
+         cantidad  numeric(14, 2),
+         orden     integer not null default 0,
+         -- Una receta no puede llevarse a sí misma. Los ciclos más largos los
+         -- corta el motor de costeo, que no puede verlos desde el esquema.
+         constraint receta_subrecetas_no_se_come_sola check (receta_id <> sub_id)
+       )`,
+      `create index if not exists receta_subrecetas_receta
+         on receta_subrecetas (receta_id, orden)`,
+      `create index if not exists receta_subrecetas_sub
+         on receta_subrecetas (sub_id)`,
+
+      // 4. Historial de precios, para poder decir qué recetas subieron.
+      `create table if not exists precio_historial (
+         id              text primary key,
+         ingrediente_id  text not null references ingredientes (id) on delete cascade,
+         precio_anterior numeric(14, 2),
+         precio_nuevo    numeric(14, 2) not null,
+         cambiado        timestamptz not null default now()
+       )`,
+      `create index if not exists precio_historial_fecha
+         on precio_historial (cambiado desc)`,
+      `create index if not exists precio_historial_ingrediente
+         on precio_historial (ingrediente_id, cambiado desc)`,
+
+      // 5. Tramos por cantidad: "1 sale $5.000, 3 salen $12.000".
+      //    `precio_total` es el precio del tramo entero, no el unitario: así es
+      //    como se lo dice al cliente y como ella lo piensa.
+      `create table if not exists receta_tramos (
+         id           text primary key,
+         receta_id    text not null references recetas (id) on delete cascade,
+         desde        integer not null check (desde > 0),
+         precio_total numeric(14, 2) not null,
+         creado       timestamptz not null default now(),
+         constraint receta_tramos_unico unique (receta_id, desde)
+       )`,
+      `create index if not exists receta_tramos_receta
+         on receta_tramos (receta_id, desde)`,
+    ],
+  },
+
+  {
+    /**
+     * En qué unidad venía el paquete.
+     *
+     * Un sobre de gelatina viene en 150 g, no en 0,15 kg. Sin esta columna el
+     * campo obligaba a cargar kilos, y "150" se habría leído como 150 kilos:
+     * el precio por kilo habría salido mil veces más barato.
+     *
+     * Se guarda la unidad que ella tipeó para poder volver a mostrárselo igual;
+     * `precio` sigue siendo el canónico por KG/LITRO/UNIDAD.
+     */
+    version: 5,
+    sentencias: [
+      `alter table ingredientes add column if not exists paquete_unidad text`,
+      `alter table ingredientes drop constraint if exists ingredientes_paquete_unidad_check`,
+      `alter table ingredientes add constraint ingredientes_paquete_unidad_check
+         check (paquete_unidad is null or paquete_unidad in ('G', 'KG', 'ML', 'LITRO', 'UNIDAD'))`,
+
+      // Lo cargado antes de esto se tipeó en la unidad canónica del ingrediente.
+      `update ingredientes
+          set paquete_unidad = unidad
+        where paquete_unidad is null and paquete_cantidad is not null`,
+    ],
+  },
 ]
 
 export const ULTIMA_VERSION = VERSIONES[VERSIONES.length - 1].version

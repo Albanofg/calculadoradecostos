@@ -40,6 +40,67 @@ export type Ingrediente = {
   precioConfirmado: boolean
   actualizado: string | null
   notas: string | null
+  /**
+   * Lo que compró, tal cual: "5 kg a $23.000". `precio` sigue siendo el
+   * canónico por KG/LITRO/UNIDAD y sale de dividir estos dos. Se guardan para
+   * poder mostrar y editar lo que ella realmente pagó, en vez de obligarla a
+   * recordar la división.
+   */
+  paqueteCantidad: number | null
+  paquetePrecio: number | null
+  /** En qué venía: 150 **g**, 5 **kg**. Null si nunca se cargó. */
+  paqueteUnidad: UnidadPaquete | null
+}
+
+/** En qué puede venir un paquete. Un sobre viene en gramos, no en kilos. */
+export type UnidadPaquete = 'G' | 'KG' | 'ML' | 'LITRO' | 'UNIDAD'
+
+/** Cuántas unidades canónicas (kilo, litro, unidad) entran en cada una. */
+const EN_UNIDAD_CANONICA: Record<UnidadPaquete, number> = {
+  G: 0.001,
+  KG: 1,
+  ML: 0.001,
+  LITRO: 1,
+  UNIDAD: 1,
+}
+
+/** Qué unidades de paquete tienen sentido según cómo se mide el ingrediente. */
+export const PAQUETES_POSIBLES: Record<Unidad, readonly UnidadPaquete[]> = {
+  KG: ['G', 'KG'],
+  LITRO: ['ML', 'LITRO'],
+  UNIDAD: ['UNIDAD'],
+}
+
+export const PAQUETE_TEXTO: Record<UnidadPaquete, string> = {
+  G: 'g',
+  KG: 'kg',
+  ML: 'ml',
+  LITRO: 'L',
+  UNIDAD: 'un',
+}
+
+/**
+ * De "150 g a $3.000" a "$20.000 el kilo", o de "5 kg a $23.000" a "$4.600".
+ *
+ * La unidad importa: sin ella, 150 se leería como 150 kilos y el precio por
+ * kilo saldría mil veces más barato.
+ */
+export function precioUnitarioDePaquete(
+  paquetePrecio: number | null,
+  paqueteCantidad: number | null,
+  unidadPaquete: UnidadPaquete = 'KG',
+): number | null {
+  if (
+    paquetePrecio === null ||
+    paqueteCantidad === null ||
+    !Number.isFinite(paquetePrecio) ||
+    !Number.isFinite(paqueteCantidad) ||
+    paqueteCantidad <= 0
+  ) {
+    return null
+  }
+  const canonica = paqueteCantidad * EN_UNIDAD_CANONICA[unidadPaquete]
+  return canonica > 0 ? paquetePrecio / canonica : null
 }
 
 export type LineaIngrediente = {
@@ -85,6 +146,41 @@ export type Foto = {
 
 export const urlFoto = (id: string): string => `/api/foto/${id}`
 
+/** Un precio que se movió. Lo arma la capa de datos; el tipo vive acá. */
+export type CambioDePrecio = {
+  ingredienteId: string
+  nombre: string
+  precioAnterior: number | null
+  precioNuevo: number
+  cambiado: string
+}
+
+/** Una preparación usada adentro de otra receta: un buttercream, un almíbar. */
+export type LineaSubreceta = {
+  id: string
+  subId: string | null
+  /** En la unidad en que rinde la preparación (g, ml, unidades o porciones). */
+  cantidad: number | null
+}
+
+/** "A partir de 3 unidades, las 3 salen $12.000". */
+export type Tramo = {
+  id: string
+  desde: number
+  precioTotal: number
+}
+
+export type UnidadRinde = 'PORCION' | 'G' | 'ML' | 'UNIDAD'
+
+export const UNIDADES_RINDE: readonly UnidadRinde[] = ['PORCION', 'G', 'ML', 'UNIDAD'] as const
+
+export const RINDE_TEXTO: Record<UnidadRinde, string> = {
+  PORCION: 'porciones',
+  G: 'gramos',
+  ML: 'mililitros',
+  UNIDAD: 'unidades',
+}
+
 export type Receta = {
   id: string
   numero: number
@@ -94,13 +190,21 @@ export type Receta = {
   procedimiento: string
   /** "Cantidad que rinde (porciones / unidades)". */
   rinde: number | null
+  /** En qué unidad rinde. Una preparación rinde gramos, no porciones. */
+  rindeUnidad: UnidadRinde
+  /** Una preparación existe para usarse dentro de otras recetas. */
+  esPreparacion: boolean
   /** Markup sobre el costo, como fracción: 0.5 = 50%. */
   margen: number
+  /** Lo que cobra de verdad. null = usar el sugerido que calcula la app. */
+  precioManual: number | null
   fecha: string
   ingredientes: LineaIngrediente[]
+  subrecetas: LineaSubreceta[]
   manoDeObra: LineaManoDeObra[]
   extras: LineaExtra[]
   fotos: Foto[]
+  tramos: Tramo[]
 }
 
 export type CostoLinea = {
@@ -112,15 +216,31 @@ export type CostoLinea = {
   motivo: 'ok' | 'sin-ingrediente' | 'sin-precio' | 'sin-cantidad'
 }
 
+export type CostoSubreceta = {
+  linea: LineaSubreceta
+  sub: Receta | null
+  costo: number
+  incierto: boolean
+  motivo: 'ok' | 'sin-preparacion' | 'sin-cantidad' | 'sin-rinde' | 'ciclo' | 'incompleta'
+}
+
 export type Costeo = {
   lineas: CostoLinea[]
+  lineasSub: CostoSubreceta[]
   ingredientes: number
+  /** Lo que aportan las preparaciones. Va aparte para poder mostrarlo. */
+  preparaciones: number
   manoDeObra: number
   extras: number
   total: number
   costoPorPorcion: number | null
-  ganancia: number
+  /** El que calcula la app: costo × (1 + margen). */
+  precioSugerido: number
+  /** El que se cobra: el manual si lo hay, si no el sugerido. */
   precioVenta: number
+  esPrecioManual: boolean
+  /** Siempre precioVenta − total, así sirve igual con precio manual. */
+  ganancia: number
   precioPorPorcion: number | null
   /**
    * El "% margen" de la planilla es un markup sobre el costo. Esto es el
@@ -160,23 +280,89 @@ export function costoDeLinea(
   return { costo, incierto: false, motivo: 'ok' }
 }
 
-export function costear(receta: Receta, catalogo: Map<string, Ingrediente>): Costeo {
+/**
+ * Costea una receta.
+ *
+ * `recetario` sólo hace falta cuando la receta usa preparaciones adentro. Si no
+ * se pasa, esas líneas quedan marcadas como incompletas en vez de valer cero:
+ * un costo que falta nunca se reporta como gratis.
+ */
+export function costear(
+  receta: Receta,
+  catalogo: Map<string, Ingrediente>,
+  recetario?: Map<string, Receta>,
+): Costeo {
+  return costearCon(receta, catalogo, recetario, new Set())
+}
+
+function costearCon(
+  receta: Receta,
+  catalogo: Map<string, Ingrediente>,
+  recetario: Map<string, Receta> | undefined,
+  enCurso: Set<string>,
+): Costeo {
   const lineas: CostoLinea[] = receta.ingredientes.map((linea) => {
     const ingrediente = linea.ingredienteId ? catalogo.get(linea.ingredienteId) ?? null : null
     const { costo, incierto, motivo } = costoDeLinea(ingrediente, linea.cantidad)
     return { linea, ingrediente, costo, incierto, motivo }
   })
 
+  // Una receta no puede estar adentro de sí misma, ni directa ni a través de
+  // otras. Sin esto, A→B→A colgaría el servidor en un bucle infinito.
+  const visitados = new Set(enCurso).add(receta.id)
+
+  const lineasSub: CostoSubreceta[] = receta.subrecetas.map((linea) => {
+    const vacio = (motivo: CostoSubreceta['motivo'], incierto: boolean): CostoSubreceta => ({
+      linea,
+      sub: null,
+      costo: 0,
+      incierto,
+      motivo,
+    })
+
+    if (!linea.subId) return vacio('sin-preparacion', true)
+    if (linea.cantidad === null || !Number.isFinite(linea.cantidad) || linea.cantidad === 0) {
+      return vacio('sin-cantidad', false)
+    }
+    if (visitados.has(linea.subId)) return vacio('ciclo', true)
+    if (!recetario) return vacio('incompleta', true)
+
+    const sub = recetario.get(linea.subId) ?? null
+    if (!sub) return vacio('sin-preparacion', true)
+    if (!sub.rinde || sub.rinde <= 0) {
+      return { linea, sub, costo: 0, incierto: true, motivo: 'sin-rinde' }
+    }
+
+    const costeoSub = costearCon(sub, catalogo, recetario, visitados)
+    const porUnidad = costeoSub.total / sub.rinde
+    return {
+      linea,
+      sub,
+      costo: porUnidad * linea.cantidad,
+      // Si a la preparación le falta un precio, a esta línea también.
+      incierto: costeoSub.incierto,
+      motivo: costeoSub.incierto ? 'incompleta' : 'ok',
+    }
+  })
+
   const ingredientes = lineas.reduce((acc, l) => acc + l.costo, 0)
+  const preparaciones = lineasSub.reduce((acc, l) => acc + l.costo, 0)
   const manoDeObra = receta.manoDeObra.reduce(
     (acc, l) => acc + costoDeTiempo(l.minutos, l.valorHora),
     0,
   )
   const extras = receta.extras.reduce((acc, l) => acc + num(l.monto), 0)
 
-  const total = ingredientes + manoDeObra + extras
-  const ganancia = total * receta.margen
-  const precioVenta = total + ganancia
+  const total = ingredientes + preparaciones + manoDeObra + extras
+  const precioSugerido = total * (1 + receta.margen)
+
+  // El precio manual manda, pero sólo si es un número usable.
+  const manual =
+    receta.precioManual !== null && Number.isFinite(receta.precioManual) && receta.precioManual > 0
+      ? receta.precioManual
+      : null
+  const precioVenta = manual ?? precioSugerido
+  const ganancia = precioVenta - total
 
   const rinde = receta.rinde && receta.rinde > 0 ? receta.rinde : null
 
@@ -185,20 +371,51 @@ export function costear(receta: Receta, catalogo: Map<string, Ingrediente>): Cos
     .map((l) => l.ingrediente?.nombre ?? '')
     .filter(Boolean)
 
+  const subsIncompletas = lineasSub
+    .filter((l) => l.incierto && l.linea.cantidad)
+    .map((l) => l.sub?.nombre ?? 'una preparación')
+
   return {
     lineas,
+    lineasSub,
     ingredientes,
+    preparaciones,
     manoDeObra,
     extras,
     total,
     costoPorPorcion: rinde ? total / rinde : null,
-    ganancia,
+    precioSugerido,
     precioVenta,
+    esPrecioManual: manual !== null,
+    ganancia,
     precioPorPorcion: rinde ? precioVenta / rinde : null,
     margenSobreVenta: precioVenta > 0 ? ganancia / precioVenta : 0,
-    sinPrecio,
-    incierto: sinPrecio.length > 0,
+    sinPrecio: [...sinPrecio, ...subsIncompletas],
+    incierto: sinPrecio.length > 0 || subsIncompletas.length > 0,
   }
+}
+
+/**
+ * El precio unitario de una receta según cuántas se lleven.
+ *
+ * Los tramos se definen como "a partir de 3, las 3 salen $12.000". Para una
+ * cantidad mayor se usa el unitario de ese tramo, así el precio nunca baja al
+ * comprar menos ni sube al comprar más.
+ */
+export function precioPorCantidad(
+  precioBase: number,
+  tramos: Tramo[],
+  cantidad: number,
+): { unitario: number; total: number; tramo: Tramo | null } {
+  const aplicable = tramos
+    .filter((t) => t.desde > 0 && t.desde <= cantidad && t.precioTotal > 0)
+    .sort((a, b) => b.desde - a.desde)[0]
+
+  if (!aplicable) {
+    return { unitario: precioBase, total: precioBase * cantidad, tramo: null }
+  }
+  const unitario = aplicable.precioTotal / aplicable.desde
+  return { unitario, total: unitario * cantidad, tramo: aplicable }
 }
 
 /**
@@ -218,6 +435,10 @@ export function escalar(receta: Receta, rindeNuevo: number): Receta {
     ...receta,
     rinde: rindeNuevo,
     ingredientes: receta.ingredientes.map((l) => ({
+      ...l,
+      cantidad: l.cantidad === null ? null : redondear(l.cantidad * factor),
+    })),
+    subrecetas: receta.subrecetas.map((l) => ({
       ...l,
       cantidad: l.cantidad === null ? null : redondear(l.cantidad * factor),
     })),

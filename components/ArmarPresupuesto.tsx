@@ -2,7 +2,14 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { costear, urlFoto, type Ingrediente, type Receta } from '@/lib/costeo.ts'
+import {
+  costear,
+  precioPorCantidad,
+  urlFoto,
+  type Ingrediente,
+  type Receta,
+  type Tramo,
+} from '@/lib/costeo.ts'
 import { plata } from '@/lib/format.ts'
 import { CifraAnimada } from './CifraAnimada.tsx'
 import { Icono } from './Icono.tsx'
@@ -59,6 +66,8 @@ type ItemPdf = {
   nombre: string
   unitario: number
   subtotal: number
+  /** Lo que saldría sin el descuento por cantidad. Igual al subtotal si no hay. */
+  sinDescuento: number
   fotoId: string | null
 }
 
@@ -145,11 +154,15 @@ async function generarPdf(
     doc.setFont('helvetica', 'bold')
     doc.text(plata(item.subtotal), ANCHO - M, y, { align: 'right' })
 
+    const conDescuento = item.sinDescuento > item.subtotal + 0.005
     if (item.cantidad > 1) {
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(9)
       doc.setTextColor(107, 74, 100)
-      doc.text(`${plata(item.unitario)} cada uno`, M + 18, y + 5)
+      const detalle = conDescuento
+        ? `${plata(item.unitario)} cada uno — ${plata(item.sinDescuento)} sin descuento`
+        : `${plata(item.unitario)} cada uno`
+      doc.text(detalle, M + 18, y + 5)
       doc.setTextColor(42, 8, 36)
     }
     y += item.cantidad > 1 ? 14 : 10
@@ -210,14 +223,24 @@ export function ArmarPresupuesto({
 
   const porId = useMemo(() => new Map(catalogo.map((i) => [i.id, i])), [catalogo])
 
+  const recetario = useMemo(() => new Map(recetas.map((r) => [r.id, r])), [recetas])
+
   const precios = useMemo(() => {
-    const m = new Map<string, { receta: Receta; precio: number; incierto: boolean }>()
+    const m = new Map<
+      string,
+      { receta: Receta; precio: number; incierto: boolean; tramos: Tramo[] }
+    >()
     for (const receta of recetas) {
-      const c = costear(receta, porId)
-      m.set(receta.id, { receta, precio: c.precioVenta, incierto: c.incierto })
+      const c = costear(receta, porId, recetario)
+      m.set(receta.id, {
+        receta,
+        precio: c.precioVenta,
+        incierto: c.incierto,
+        tramos: receta.tramos,
+      })
     }
     return m
-  }, [recetas, porId])
+  }, [recetas, porId, recetario])
 
   const items = useMemo(
     () =>
@@ -225,11 +248,19 @@ export function ArmarPresupuesto({
         .map((l) => {
           const datos = l.recetaId ? precios.get(l.recetaId) : undefined
           if (!datos) return null
+          const { unitario, total, tramo } = precioPorCantidad(
+            datos.precio,
+            datos.tramos,
+            l.cantidad,
+          )
           return {
             linea: l,
             receta: datos.receta,
-            unitario: datos.precio,
-            subtotal: datos.precio * l.cantidad,
+            unitario,
+            subtotal: total,
+            // Lo que costaría sin el descuento, para poder mostrarle el ahorro.
+            sinDescuento: datos.precio * l.cantidad,
+            tramo,
             incierto: datos.incierto,
           }
         })
@@ -256,6 +287,7 @@ export function ArmarPresupuesto({
           nombre: i.receta.nombre,
           unitario: i.unitario,
           subtotal: i.subtotal,
+          sinDescuento: i.sinDescuento,
           fotoId: i.receta.fotos[0]?.id ?? null,
         })),
         total,
@@ -471,6 +503,11 @@ export function ArmarPresupuesto({
                 <div key={i.linea.id} className="total-renglon">
                   <span>
                     {i.linea.cantidad} × {i.receta.nombre}
+                    {i.tramo ? (
+                      <span className="marca-descuento">
+                        −{plata(i.sinDescuento - i.subtotal)}
+                      </span>
+                    ) : null}
                   </span>
                   <span className="cifra">{plata(i.subtotal)}</span>
                 </div>
