@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   costear,
@@ -23,8 +23,15 @@ import { Icono } from './Icono.tsx'
 
 type Linea = { id: string; recetaId: string; cantidad: number }
 
-const nuevaLinea = (): Linea => ({
-  id: Math.random().toString(36).slice(2, 11),
+/**
+ * Los ids se cuentan, no se sortean.
+ *
+ * Con `Math.random()` la primera línea salía con un id en el servidor y otro
+ * en el cliente, y React no podía hidratar: el `htmlFor` del label y el `id`
+ * del input no coincidían.
+ */
+const nuevaLinea = (n: number): Linea => ({
+  id: `pedido-${n}`,
   recetaId: '',
   cantidad: 1,
 })
@@ -87,18 +94,18 @@ async function generarPdf(
   const hoy = new Date()
 
   // Encabezado
-  doc.setFillColor(68, 11, 61)
+  doc.setFillColor(46, 61, 49)
   doc.rect(0, 0, ANCHO, 40, 'F')
-  doc.setTextColor(253, 247, 251)
+  doc.setTextColor(251, 249, 243)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(22)
-  doc.text('Presupuesto', M, 21)
+  doc.text('Casita Dulce', M, 20)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
   doc.text(
-    `${hoy.getDate()} de ${MESES[hoy.getMonth()]} de ${hoy.getFullYear()}`,
+    `Presupuesto · ${hoy.getDate()} de ${MESES[hoy.getMonth()]} de ${hoy.getFullYear()}`,
     M,
-    30,
+    29,
   )
   if (cliente.trim()) {
     doc.setFont('helvetica', 'bold')
@@ -125,19 +132,19 @@ async function generarPdf(
   }
 
   // Encabezado de la tabla
-  doc.setTextColor(107, 74, 100)
+  doc.setTextColor(90, 97, 86)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(9)
   doc.text('CANT.', M, y)
   doc.text('DETALLE', M + 18, y)
   doc.text('PRECIO', ANCHO - M, y, { align: 'right' })
   y += 3
-  doc.setDrawColor(213, 197, 211)
+  doc.setDrawColor(204, 207, 194)
   doc.setLineWidth(0.3)
   doc.line(M, y, M + util, y)
   y += 8
 
-  doc.setTextColor(42, 8, 36)
+  doc.setTextColor(38, 42, 36)
   for (const item of items) {
     if (y > 250) {
       doc.addPage()
@@ -158,12 +165,12 @@ async function generarPdf(
     if (item.cantidad > 1) {
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(9)
-      doc.setTextColor(107, 74, 100)
+      doc.setTextColor(90, 97, 86)
       const detalle = conDescuento
         ? `${plata(item.unitario)} cada uno — ${plata(item.sinDescuento)} sin descuento`
         : `${plata(item.unitario)} cada uno`
       doc.text(detalle, M + 18, y + 5)
-      doc.setTextColor(42, 8, 36)
+      doc.setTextColor(38, 42, 36)
     }
     y += item.cantidad > 1 ? 14 : 10
   }
@@ -174,9 +181,9 @@ async function generarPdf(
     doc.addPage()
     y = M + 10
   }
-  doc.setFillColor(39, 71, 14)
+  doc.setFillColor(125, 108, 63)
   doc.rect(M, y, util, 26, 'F')
-  doc.setTextColor(253, 247, 251)
+  doc.setTextColor(251, 249, 243)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.text('TOTAL', M + 8, y + 10)
@@ -185,7 +192,7 @@ async function generarPdf(
   y += 38
 
   if (nota.trim()) {
-    doc.setTextColor(42, 8, 36)
+    doc.setTextColor(38, 42, 36)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
     for (const linea of doc.splitTextToSize(nota.trim(), util)) {
@@ -195,7 +202,7 @@ async function generarPdf(
     }
   }
 
-  doc.setTextColor(156, 135, 154)
+  doc.setTextColor(120, 128, 111)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.text(
@@ -214,7 +221,10 @@ export function ArmarPresupuesto({
   recetas: Receta[]
   catalogo: Ingrediente[]
 }) {
-  const [lineas, setLineas] = useState<Linea[]>([nuevaLinea()])
+  const [lineas, setLineas] = useState<Linea[]>([nuevaLinea(0)])
+  // Cuenta de líneas creadas, para que cada id nuevo sea único y estable.
+  const contador = useRef(1)
+  const agregarLinea = () => nuevaLinea(contador.current++)
   const [cliente, setCliente] = useState('')
   const [nota, setNota] = useState('')
   const [validez, setValidez] = useState(7)
@@ -401,7 +411,7 @@ export function ArmarPresupuesto({
                       onClick={() =>
                         setLineas((ls) =>
                           ls.length === 1
-                            ? [nuevaLinea()]
+                            ? [agregarLinea()]
                             : ls.filter((l) => l.id !== linea.id),
                         )
                       }
@@ -417,7 +427,7 @@ export function ArmarPresupuesto({
             <button
               type="button"
               className="boton boton--agregar"
-              onClick={() => setLineas((ls) => [...ls, nuevaLinea()])}
+              onClick={() => setLineas((ls) => [...ls, agregarLinea()])}
             >
               <Icono nombre="mas" tam={18} />
               Agregar otra receta

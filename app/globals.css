@@ -9,60 +9,72 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* La paleta, tal cual */
-  --violeta: #440b3d; /* Midnight Violet */
-  --abeto: #27470e; /* Dark Spruce   */
-  --flor: #f6bdd1; /* Soft Blossom  */
-  --velo: #f6e4f6; /* Lavender Veil */
-  --humo: #f4f4f4; /* White Smoke   */
+  /* La paleta sale del logo: verde salvia, amarillo manteca, rosa floral y
+     verde oliva, muestreados de casita-dulce-completo.png. */
+  --salvia: #939f91; /* el verde del fondo del logo */
+  --manteca: #f7d27f; /* la casa y el lettering      */
+  --rosa-flor: #d38d83; /* las flores de la guirnalda  */
+  --oliva: #9a8959; /* las hojas                   */
 
-  /* Derivados, para tener profundidad dentro de cada color */
-  --violeta-hondo: #33072e;
-  --violeta-claro: #5e1455;
-  --abeto-hondo: #1c330a;
-  --flor-tenue: #fdeff4;
+  /* Derivados, para tener con qué hacer jerarquía y contraste */
+  --bosque: #3f5243; /* el salvia llevado a profundidad */
+  --bosque-hondo: #2e3d31;
+  --bosque-claro: #52684f;
+  --bosque-tenue: #e9ede8;
+  --oliva-hondo: #7d6c3f;
+  --rosa-hondo: #a15a50;
+  --manteca-tenue: #fdf4e0;
 
   /* Superficies */
-  --fondo: var(--humo);
+  --fondo: #f6f4ef;
   --superficie: #ffffff;
-  --superficie-2: #fbfafb;
-  --superficie-3: var(--velo);
+  --superficie-2: #fbfaf6;
+  --superficie-3: #eaeee7;
 
   /* Bordes */
-  --borde: #e9e0e8;
-  --borde-fuerte: #d5c5d3;
+  --borde: #e3e4db;
+  --borde-fuerte: #cccfc2;
 
   /* Tinta */
-  --tinta: #2a0824;
-  --tinta-media: #6b4a64;
-  --tinta-suave: #786073;
-  --tinta-sobre-oscuro: #fdf7fb;
-  --tinta-sobre-oscuro-suave: #cdb3c8;
+  --tinta: #262a24;
+  --tinta-media: #5a6156;
+  --tinta-suave: #656c5d;
+  --tinta-sobre-oscuro: #fbf9f3;
+  --tinta-sobre-oscuro-suave: #c3c9bd;
 
   /* Acento */
-  --acento: var(--violeta);
-  --acento-fuerte: var(--violeta-hondo);
-  --acento-tenue: var(--velo);
+  --acento: var(--bosque);
+  --acento-fuerte: var(--bosque-hondo);
+  --acento-tenue: var(--bosque-tenue);
 
-  /* Estados. El rojo de alerta se separa a propósito del rosa de la marca:
-     si el error se pareciera al acento, dejaría de leerse como error. */
-  --alerta: #a3123c;
-  --alerta-fondo: #fdeef3;
-  --alerta-borde: #f0c9d7;
-  --aviso: #8a5a00;
-  --aviso-fondo: #fdf5e6;
-  --exito: var(--abeto);
+  /* Estados. El rojo se separa del rosa de la marca a propósito: si el error
+     se pareciera al acento, dejaría de leerse como error. */
+  --alerta: #9e3122;
+  --alerta-fondo: #fbeeea;
+  --alerta-borde: #eed2c9;
+  --aviso: #8a6a1a;
+  --aviso-fondo: #fcf3e0;
+  --exito: var(--bosque);
 
-  /* Profundidad, teñida de violeta en vez de gris */
-  --sombra-1: 0 1px 2px rgba(42, 8, 36, 0.05), 0 1px 3px rgba(42, 8, 36, 0.04);
-  --sombra-2: 0 2px 4px rgba(42, 8, 36, 0.04), 0 8px 20px rgba(42, 8, 36, 0.07);
-  --sombra-3: 0 14px 40px rgba(42, 8, 36, 0.14);
-  --sombra-foco: 0 0 0 3px rgba(68, 11, 61, 0.16);
+  /* Profundidad, teñida de verde en vez de gris */
+  --sombra-1: 0 1px 2px rgba(38, 42, 36, 0.05), 0 1px 3px rgba(38, 42, 36, 0.04);
+  --sombra-2: 0 2px 4px rgba(38, 42, 36, 0.04), 0 8px 20px rgba(38, 42, 36, 0.07);
+  --sombra-3: 0 14px 40px rgba(38, 42, 36, 0.14);
+  --sombra-foco: 0 0 0 3px rgba(63, 82, 67, 0.18);
 
   /* Forma */
   --radio: 18px;
   --radio-chico: 12px;
   --radio-micro: 8px;
+
+  /* Espacio */
+  --e1: 4px;
+  --e2: 8px;
+  --e3: 12px;
+  --e4: 16px;
+  --e5: 24px;
+  --e6: 32px;
+  --e7: 48px;
 
   /* Movimiento. Un solo vocabulario para toda la app.
      La salida es la curva por defecto: arranca rápido y frena, que es como se
@@ -77,15 +89,6 @@
   --vel-4: 520ms; /* pantalla: cambiar de página */
 
   --escalon: 55ms; /* retraso entre hermanos en cascada */
-
-  /* Espacio */
-  --e1: 4px;
-  --e2: 8px;
-  --e3: 12px;
-  --e4: 16px;
-  --e5: 24px;
-  --e6: 32px;
-  --e7: 48px;
 
   --riel-alto: 84px;
   --ancho-max: 1480px;
@@ -115,8 +118,8 @@ body {
   background-color: var(--fondo);
   background-image: radial-gradient(
     120% 70% at 50% -10%,
-    var(--velo) 0%,
-    rgba(246, 228, 246, 0) 62%
+    var(--superficie-3) 0%,
+    rgba(234, 238, 231, 0) 62%
   );
   background-repeat: no-repeat;
   background-attachment: fixed;
@@ -259,7 +262,7 @@ h3 {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: rgba(244, 244, 244, 0.82);
+  background: rgba(246, 244, 239, 0.84);
   backdrop-filter: blur(12px) saturate(1.4);
   -webkit-backdrop-filter: blur(12px) saturate(1.4);
   border-bottom: 1px solid var(--borde);
@@ -311,7 +314,7 @@ h3 {
   gap: var(--e1);
   margin-left: auto;
   align-items: center;
-  background: rgba(68, 11, 61, 0.06);
+  background: rgba(38, 42, 36, 0.06);
   padding: 3px;
   border-radius: 999px;
 }
@@ -359,7 +362,7 @@ h3 {
 }
 
 .pestana[aria-current='page'] {
-  color: var(--violeta);
+  color: var(--bosque);
   font-weight: 600;
 }
 
@@ -422,19 +425,19 @@ h3 {
 }
 
 .campo--ingredientes {
-  --marca-color: var(--violeta);
+  --marca-color: var(--bosque);
 }
 .campo--mano {
-  --marca-color: var(--abeto);
+  --marca-color: var(--oliva-hondo);
 }
 .campo--extras {
-  --marca-color: #8a3a62;
+  --marca-color: var(--rosa-hondo);
 }
 .campo--datos {
   --marca-color: var(--tinta-media);
 }
 .campo--presupuesto {
-  --marca-color: var(--violeta);
+  --marca-color: var(--bosque);
 }
 
 /* ─── Línea: una fila de la receta ───────────────────────────────────────── */
@@ -560,7 +563,7 @@ textarea.entrada {
 
 .selector {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b4a64' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%235a6156' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right var(--e3) center;
   padding-right: var(--e6);
@@ -643,7 +646,7 @@ textarea.entrada {
 }
 
 .boton--agregar:hover {
-  background: var(--flor-tenue);
+  background: var(--manteca-tenue);
   border-color: var(--acento);
   border-style: solid;
   color: var(--acento-fuerte);
@@ -677,14 +680,14 @@ textarea.entrada {
 
 /* Seleccionado: un botón que quedó apretado (margen sugerido, filtro activo). */
 .boton--activo {
-  background: var(--violeta);
-  border-color: var(--violeta);
+  background: var(--bosque);
+  border-color: var(--bosque);
   color: var(--tinta-sobre-oscuro);
 }
 
 .boton--activo:hover {
-  background: var(--violeta-hondo);
-  border-color: var(--violeta-hondo);
+  background: var(--bosque-hondo);
+  border-color: var(--bosque-hondo);
 }
 
 .boton:disabled {
@@ -709,7 +712,7 @@ textarea.entrada {
 }
 
 .total-caja .boton:disabled {
-  background: rgba(253, 247, 251, 0.16);
+  background: rgba(251, 249, 243, 0.16);
   color: var(--tinta-sobre-oscuro-suave);
   opacity: 1;
 }
@@ -718,7 +721,7 @@ textarea.entrada {
 
 .total-caja {
   border-radius: var(--radio);
-  background: linear-gradient(168deg, var(--violeta-claro) 0%, var(--violeta) 42%, var(--violeta-hondo) 100%);
+  background: linear-gradient(168deg, var(--bosque-claro) 0%, var(--bosque) 44%, var(--bosque-hondo) 100%);
   color: var(--tinta-sobre-oscuro);
   overflow: hidden;
   box-shadow: var(--sombra-2);
@@ -740,7 +743,7 @@ textarea.entrada {
 
 .total-seccion {
   padding: var(--e5);
-  border-bottom: 1px solid rgba(253, 247, 251, 0.14);
+  border-bottom: 1px solid rgba(251, 249, 243, 0.14);
 }
 
 .total-seccion:last-child {
@@ -769,7 +772,7 @@ textarea.entrada {
   font-weight: 550;
   padding-top: var(--e3);
   margin-top: var(--e2);
-  border-top: 1px solid rgba(253, 247, 251, 0.14);
+  border-top: 1px solid rgba(251, 249, 243, 0.14);
 }
 
 .total-grande {
@@ -784,7 +787,7 @@ textarea.entrada {
 }
 
 .total-venta {
-  background: linear-gradient(170deg, #2f5612 0%, var(--abeto-hondo) 100%);
+  background: linear-gradient(170deg, #8d7845 0%, var(--oliva-hondo) 100%);
 }
 
 /* El pie de la caja: el botón y, debajo, por qué no se puede todavía. */
@@ -814,11 +817,11 @@ textarea.entrada {
   padding: var(--e2) max(var(--e4), env(safe-area-inset-left, 0px))
     calc(var(--e2) + env(safe-area-inset-bottom, 0px))
     max(var(--e4), env(safe-area-inset-right, 0px));
-  background: rgba(51, 7, 46, 0.95);
+  background: rgba(46, 61, 49, 0.95);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   color: var(--tinta-sobre-oscuro);
-  box-shadow: 0 -6px 24px rgba(42, 8, 36, 0.22);
+  box-shadow: 0 -6px 24px rgba(38, 42, 36, 0.22);
 }
 
 @media (min-width: 1024px) {
@@ -880,7 +883,7 @@ textarea.entrada {
   border: 1px solid var(--alerta-borde);
   border-radius: var(--radio-chico);
   background: var(--alerta-fondo);
-  color: #7a0e2c;
+  color: #7d2419;
   font-size: 14px;
   line-height: 1.5;
 }
@@ -944,8 +947,8 @@ textarea.entrada {
 }
 
 .marca-estado--fresco {
-  color: var(--abeto);
-  background: #eaf0e2;
+  color: var(--bosque);
+  background: var(--bosque-tenue);
 }
 
 /* ─── Estado vacío ───────────────────────────────────────────────────────── */
@@ -971,8 +974,8 @@ textarea.entrada {
 }
 
 .vacio-tarjeta > svg {
-  color: var(--violeta);
-  background: var(--flor-tenue);
+  color: var(--bosque);
+  background: var(--manteca-tenue);
   padding: 12px;
   border-radius: 50%;
   box-sizing: content-box;
@@ -1193,7 +1196,7 @@ textarea.entrada {
   content: '';
   position: absolute;
   inset: 40% 0 0;
-  background: linear-gradient(to top, rgba(42, 8, 36, 0.42), transparent);
+  background: linear-gradient(to top, rgba(38, 42, 36, 0.42), transparent);
   opacity: 0;
   transition: opacity var(--vel-3) var(--ease-suave);
   pointer-events: none;
@@ -1208,8 +1211,8 @@ textarea.entrada {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #a9637f;
-  background: linear-gradient(145deg, var(--velo) 0%, var(--flor-tenue) 100%);
+  color: #9aa394;
+  background: linear-gradient(145deg, var(--superficie-3) 0%, var(--manteca-tenue) 100%);
 }
 
 .receta-precio-flota {
@@ -1218,7 +1221,7 @@ textarea.entrada {
   bottom: var(--e3);
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(51, 7, 46, 0.88);
+  background: rgba(38, 42, 36, 0.86);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: var(--tinta-sobre-oscuro);
@@ -1250,7 +1253,7 @@ textarea.entrada {
 }
 
 .receta-titulo a:hover {
-  color: var(--acento);
+  color: var(--bosque);
 }
 
 .receta-resumen {
@@ -1325,7 +1328,7 @@ textarea.entrada {
   justify-content: center;
   border-radius: 50%;
   border: none;
-  background: rgba(51, 7, 46, 0.78);
+  background: rgba(38, 42, 36, 0.78);
   color: #fff;
   cursor: pointer;
   backdrop-filter: blur(6px);
@@ -1355,7 +1358,7 @@ textarea.entrada {
 }
 
 .subir-foto:hover {
-  background: var(--flor-tenue);
+  background: var(--manteca-tenue);
   border-color: var(--acento);
   color: var(--acento-fuerte);
 }
@@ -1683,7 +1686,7 @@ textarea.entrada {
 }
 
 .volver:hover {
-  color: var(--violeta);
+  color: var(--bosque);
 }
 
 .volver:hover .icono-vuelve {
@@ -1775,22 +1778,22 @@ textarea.entrada {
 .nota--calculo {
   padding: var(--e2) var(--e3);
   border-radius: var(--radio-micro);
-  background: var(--acento-tenue);
-  color: var(--violeta-hondo);
+  background: var(--manteca-tenue);
+  color: var(--oliva-hondo);
 }
 
 /* ─── Precio final, dentro de la caja oscura ─────────────────────────────── */
 
 .precio-final-abrir {
   margin-top: var(--e3);
-  background: rgba(253, 247, 251, 0.14);
+  background: rgba(251, 249, 243, 0.14);
   border-color: transparent;
   color: var(--tinta-sobre-oscuro);
   box-shadow: none;
 }
 
 .precio-final-abrir:hover:not(:disabled) {
-  background: rgba(253, 247, 251, 0.22);
+  background: rgba(251, 249, 243, 0.22);
   border-color: transparent;
 }
 
@@ -1800,12 +1803,12 @@ textarea.entrada {
   gap: var(--e2);
   margin-top: var(--e4);
   padding-top: var(--e4);
-  border-top: 1px solid rgba(253, 247, 251, 0.16);
+  border-top: 1px solid rgba(251, 249, 243, 0.16);
 }
 
 .precio-final .entrada {
-  background: rgba(253, 247, 251, 0.1);
-  border-color: rgba(253, 247, 251, 0.24);
+  background: rgba(251, 249, 243, 0.1);
+  border-color: rgba(251, 249, 243, 0.24);
   color: var(--tinta-sobre-oscuro);
   font-size: 20px;
   font-weight: 650;
@@ -1816,12 +1819,12 @@ textarea.entrada {
 }
 
 .precio-final .entrada:focus {
-  border-color: var(--flor);
-  box-shadow: 0 0 0 3px rgba(246, 189, 209, 0.22);
+  border-color: var(--manteca);
+  box-shadow: 0 0 0 3px rgba(247, 210, 127, 0.3);
 }
 
 .precio-final .boton {
-  background: rgba(253, 247, 251, 0.14);
+  background: rgba(251, 249, 243, 0.14);
   border-color: transparent;
   color: var(--tinta-sobre-oscuro);
   box-shadow: none;
@@ -1829,7 +1832,7 @@ textarea.entrada {
 }
 
 .precio-final .boton:hover {
-  background: rgba(253, 247, 251, 0.24);
+  background: rgba(251, 249, 243, 0.24);
   border-color: transparent;
 }
 
@@ -1857,8 +1860,8 @@ textarea.entrada {
   margin-left: 6px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: var(--flor);
-  color: var(--violeta-hondo);
+  background: var(--manteca);
+  color: var(--tinta);
   font-size: 11.5px;
   font-weight: 650;
   white-space: nowrap;
@@ -1892,7 +1895,7 @@ textarea.entrada {
   width: 20px;
   height: 20px;
   margin: 2px 0 0;
-  accent-color: var(--violeta);
+  accent-color: var(--bosque);
   cursor: pointer;
 }
 
@@ -1939,7 +1942,7 @@ textarea.entrada {
 }
 
 a.cambio-nombre:hover {
-  color: var(--violeta);
+  color: var(--bosque);
   text-decoration: underline;
 }
 
@@ -1988,4 +1991,47 @@ a.cambio-nombre:hover {
 
 .con-sufijo:has(.sufijo-unidad) .entrada {
   padding-right: 72px;
+}
+
+/* El logo de la barra: redondo, con un filete claro que lo despega del fondo. */
+.marca-logo {
+  border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 0 1px var(--borde);
+}
+
+/* ─── Pantalla de carga con la marca ─────────────────────────────────────── */
+
+.cargando-marca {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--e3);
+  padding-block: var(--e7) var(--e6);
+  text-align: center;
+}
+
+.cargando-logo {
+  border-radius: var(--radio);
+  /* Late despacio: señala que está trabajando sin pedir atención. */
+  animation: respirar 1.9s var(--ease-suave) infinite;
+}
+
+@keyframes respirar {
+  0%,
+  100% {
+    opacity: 0.62;
+    transform: scale(0.975);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cargando-logo {
+    animation: none;
+    opacity: 1;
+  }
 }

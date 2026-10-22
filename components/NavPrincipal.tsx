@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Icono, type Nombre } from './Icono.tsx'
@@ -74,8 +75,15 @@ export function NavPrincipal() {
     <nav className="barra">
       <div className="barra-interna">
         <Link href="/" className="marca">
-          <Icono nombre="balanza" tam={22} />
-          <span className="marca-texto">Calculadora de Costos</span>
+          <Image
+            src="/marca/casita-dulce-circular.png"
+            alt=""
+            width={34}
+            height={34}
+            priority
+            className="marca-logo"
+          />
+          <span className="marca-texto">Casita Dulce</span>
         </Link>
 
         <div className="pestanas" ref={contenedor}>

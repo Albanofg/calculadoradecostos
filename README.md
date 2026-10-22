@@ -1,4 +1,4 @@
-# Calculadora de Costos
+# Casita Dulce
 
 Costeo de recetas de pastelería. Reemplaza la planilla `CALCULADORA 2026-.xlsx`.
 

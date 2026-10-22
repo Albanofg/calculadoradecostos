@@ -4,10 +4,15 @@
 > `:root` de `app/globals.css` con clases semánticas, así que reemplazarlo no toca
 > la lógica ni los componentes.
 
-El mundo anterior ("Baldosa y Enlozado": paneles de esmalte con bordes negros de 2px
-sobre cemento) fue descartado. Su problema, en las palabras del usuario, era que quedó
-"en el tiempo": bordes duros en todo, cero profundidad, rótulos en mayúscula por todos
-lados y paneles de color saturado macizo. Eso es un idioma plano de hace diez años.
+**La paleta sale del logo de Casita Dulce**, muestreada de
+`public/marca/casita-dulce-completo.png`: verde salvia, amarillo manteca, rosa floral y
+verde oliva. El salvia del logo es demasiado claro y apagado para cargar texto o
+acciones, así que se lo llevó a profundidad (`--bosque`) y el salvia original quedó
+guardado como token de marca.
+
+Antes hubo dos mundos descartados: "Baldosa y Enlozado" (esmalte con bordes negros duros
+sobre cemento), que quedó plano y viejo, y una paleta Midnight Violet / Dark Spruce que
+se peleaba con el logo.
 
 ## El sistema actual
 
@@ -27,23 +32,48 @@ importa.
 
 | Grupo | Tokens |
 |---|---|
-| Superficies | `--fondo` `#f6f3ee`, `--superficie` `#fff`, `--superficie-2`, `--superficie-3` |
-| Bordes | `--borde` `#e9e3d9`, `--borde-fuerte` `#d8d0c3` |
-| Tinta | `--tinta` `#1c1a17`, `--tinta-media`, `--tinta-suave` |
-| Acento | `--acento` `#15605c`, `--acento-fuerte`, `--acento-tenue` |
-| Estados | `--alerta` `#ad2a1f`, `--aviso` `#8a5a00` + sus fondos |
-| Profundidad | `--sombra-1/2/3`, `--sombra-foco` |
-| Forma | `--radio` 14px, `--radio-chico` 10px, `--radio-micro` 7px |
+| Marca | `--salvia` `#939f91`, `--manteca` `#f7d27f`, `--rosa-flor` `#d38d83`, `--oliva` `#9a8959` |
+| Derivados | `--bosque` `#3f5243`, `--bosque-hondo` `#2e3d31`, `--bosque-claro`, `--bosque-tenue`, `--oliva-hondo` `#7d6c3f`, `--rosa-hondo` `#a15a50`, `--manteca-tenue` |
+| Superficies | `--fondo` `#f6f4ef`, `--superficie` `#fff`, `--superficie-2`, `--superficie-3` |
+| Bordes | `--borde` `#e3e4db`, `--borde-fuerte` `#cccfc2` |
+| Tinta | `--tinta` `#262a24`, `--tinta-media` `#5a6156`, `--tinta-suave` `#656c5d` |
+| Acento | `--acento` = `--bosque`, `--acento-fuerte`, `--acento-tenue` |
+| Estados | `--alerta` `#9e3122`, `--aviso` `#8a6a1a` + sus fondos |
+| Profundidad | `--sombra-1/2/3` teñidas de verde, `--sombra-foco` |
+| Forma | `--radio` 18px, `--radio-chico` 12px, `--radio-micro` 8px |
 | Espacio | `--e1` 4px … `--e7` 48px |
 
-Los colores por sección (`--marca-color`) son el trazo del título: verde para
-ingredientes, ámbar para mano de obra, terracota para extras, gris para datos.
+Los colores por sección (`--marca-color`) son el trazo del título: bosque para
+ingredientes, oliva para mano de obra, rosa para extras, gris para datos.
+
+El **amarillo manteca** es el acento de celebración: el chip de descuento por cantidad
+y el foco del precio final. Nunca lleva texto claro encima — sólo tinta oscura, que da
+10:1.
+
+**El rojo de alerta se separa a propósito del rosa de la marca.** Si el error se
+pareciera al acento, dejaría de leerse como error.
+
+Los 17 pares de contraste del sistema pasan 4.5:1. Hay un script de verificación en el
+historial de la sesión; conviene volver a correrlo si se toca un color.
+
+### La marca en la interfaz
+
+| Dónde | Archivo |
+|---|---|
+| Barra superior | `public/marca/casita-dulce-circular.png`, 34px, redondo con filete |
+| Pantallas de carga | `public/marca/casita-dulce-completo.png`, 132px, con un latido lento |
+| Pestaña del navegador | `app/icon.png`, generado del cuadrado |
+| Pantalla de inicio de iPhone | `app/apple-icon.png`, 180px |
+| Encabezado del PDF | Banda en `--bosque-hondo`, por ahora sin logo |
 
 ### Tipografía
 
 **Archivo** variable, con eje de ancho, servida por `next/font/google`. Grotesca
 dibujada en Buenos Aires, con cifras tabulares reales, que es lo que importa cuando hay
 columnas de plata. `font-stretch: 110%` para las cifras grandes; 400–650 para el resto.
+
+El lettering del logo es manuscrito y no se replica en la interfaz: una script no sirve
+para leer tablas de números. El logo pone la voz; Archivo pone la legibilidad.
 
 Todo lo numérico lleva `font-variant-numeric: tabular-nums` para que no baile al tipear.
 

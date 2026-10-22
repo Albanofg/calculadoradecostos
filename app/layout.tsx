@@ -12,16 +12,16 @@ const archivo = Archivo({
 })
 
 export const metadata: Metadata = {
-  title: 'Calculadora de Costos',
+  title: 'Casita Dulce',
   description:
-    'Costeo de recetas de pastelería: ingredientes, mano de obra, packaging y precio de venta sugerido.',
+    'Recetario y costeo de Casita Dulce: ingredientes, mano de obra, packaging y precio de venta.',
 }
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#f4f4f4',
+  themeColor: '#f6f4ef',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

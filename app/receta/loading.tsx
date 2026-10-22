@@ -1,10 +1,8 @@
-export default function Cargando() {
+import { Cargando } from '@/components/Cargando.tsx'
+
+export default function CargandoReceta() {
   return (
-    <main className="pagina" aria-busy="true" aria-live="polite">
-      <span className="solo-lectores">Cargando la receta…</span>
-      <div className="esqueleto esqueleto--linea" style={{ width: 120, marginBottom: 20 }} />
-      <div className="esqueleto esqueleto--titulo" />
-      <div className="esqueleto esqueleto--linea" style={{ width: '62%', marginBottom: 32 }} />
+    <Cargando texto="Abriendo la receta…">
       <div className="doble">
         <div className="columna">
           <div className="esqueleto" style={{ height: 250 }} />
@@ -15,6 +13,6 @@ export default function Cargando() {
           <div className="esqueleto" style={{ height: 380 }} />
         </div>
       </div>
-    </main>
+    </Cargando>
   )
 }
